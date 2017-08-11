@@ -35,6 +35,9 @@ _private.loadNconf = function loadNconf(options) {
     nconf.file('default-env', path.join(baseConfigPath, 'env', 'config.' + env + '.json'));
     nconf.file('defaults', path.join(baseConfigPath, 'defaults.json'));
 
+    // set settings manually from azure app service
+    nconf.set('server:port', process.env.PORT);
+
     /**
      * transform all relative paths to absolute paths
      * transform sqlite filename path for Ghost-CLI
