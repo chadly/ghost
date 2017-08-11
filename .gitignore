@@ -1,0 +1,3 @@
+/content/data/*.db
+/content/images
+node_modules
