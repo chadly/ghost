@@ -85,6 +85,8 @@ class LocalFileStore extends StorageBase {
                 {
                     maxAge: constants.ONE_YEAR_MS,
                     fallthrough: false,
+                    etag: false,
+                    lastModified: false,
                     onEnd: function onEnd() {
                         common.logging.info('LocalFileStorage.serve', req.path, moment().diff(startedAtMoment, 'ms') + 'ms');
                     }

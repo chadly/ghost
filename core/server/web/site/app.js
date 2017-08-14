@@ -129,6 +129,9 @@ module.exports = function setupSiteApp(options = {}) {
     // Fetch the frontend client into res.locals
     siteApp.use(frontendClient);
 
+    // don't generate etags; don't want the CDN hitting the server constantly
+    siteApp.disable("etag");
+
     debug('General middleware done');
 
     router = siteRoutes(options);
