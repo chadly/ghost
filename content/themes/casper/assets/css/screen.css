@@ -358,6 +358,10 @@ The knock-on effect of this is ugly browser-scroll bars at the bottom, so 80px o
 /* 6. Post Feed
 /* ---------------------------------------------------------- */
 
+.site-main {
+    z-index: 100;
+}
+
 .post-feed {
     position: relative;
     display: flex;
@@ -388,6 +392,9 @@ The knock-on effect of this is ugly browser-scroll bars at the bottom, so 80px o
 
 .post-card-image-link {
     position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: 5px 5px 0 0;
 }
 
 .post-card-image {
@@ -759,7 +766,7 @@ Usage (In Ghost editor):
 }
 
 @media (min-width: 1000px) {
-    .post-full-content blockquote {
+    .post-full-content blockquote:not(:first-of-type) {
         width: 100vw;
         max-width: 1060px;
     }
