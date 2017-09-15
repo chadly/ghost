@@ -1,8 +1,7 @@
-var Promise = require('bluebird'),
-    size = require('./image-size-from-url'),
+var debug = require('ghost-ignition').debug('utils:image-size-cache'),
+    imageSize = require('./image-size'),
     logging = require('../logging'),
     errors = require('../errors'),
-    getImageSizeFromUrl = size.getImageSizeFromUrl,
     imageSizeCache = {};
 
 /**
@@ -20,22 +19,31 @@ function getCachedImageSizeFromUrl(url) {
 
     // image size is not in cache
     if (!imageSizeCache[url]) {
-        return getImageSizeFromUrl(url).then(function (res) {
+        return imageSize.getImageSizeFromUrl(url).then(function (res) {
             imageSizeCache[url] = res;
 
-            return Promise.resolve(imageSizeCache[url]);
+            debug('Cached image:', url);
+
+            return imageSizeCache[url];
         }).catch(errors.NotFoundError, function () {
+            debug('Cached image (not found):', url);
             // in case of error we just attach the url
-            return Promise.resolve(imageSizeCache[url] = url);
+            imageSizeCache[url] = url;
+
+            return imageSizeCache[url];
         }).catch(function (err) {
+            debug('Cached image (error):', url);
             logging.error(err);
 
             // in case of error we just attach the url
-            return Promise.resolve(imageSizeCache[url] = url);
+            imageSizeCache[url] = url;
+
+            return imageSizeCache[url];
         });
     }
+    debug('Read image from cache:', url);
     // returns image size from cache
-    return Promise.resolve(imageSizeCache[url]);
+    return imageSizeCache[url];
 }
 
 module.exports = getCachedImageSizeFromUrl;
