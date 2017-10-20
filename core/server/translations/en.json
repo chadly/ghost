@@ -107,7 +107,11 @@
             "themehandler": {
                 "missingTheme": "The currently active theme \"{theme}\" is missing.",
                 "invalidTheme": "The currently active theme \"{theme}\" is invalid.",
-                "themeHasErrors": "The currently active theme \"{theme}\" has errors, but will still work."
+                "themeHasErrors": "The currently active theme \"{theme}\" has errors, but will still work.",
+                "activateFailed": "Unable to activate the theme \"{theme}\"."
+            },
+            "redirects": {
+                "register": "Could not register custom redirects."
             }
         },
         "utils": {
@@ -119,7 +123,8 @@
             },
             "blogIcon": {
                 "error": "Could not fetch icon dimensions."
-            }
+            },
+            "redirectsWrongFormat": "Incorrect redirects file format."
         },
         "config": {
             "couldNotLocateConfigFile": {
@@ -167,9 +172,9 @@
         },
         "general": {
             "maintenance": "Ghost is currently undergoing maintenance, please wait a moment then retry.",
-            "moreInfo": "\nMore info: {info}",
             "requiredOnFuture": "This will be required in future. Please see {link}",
-            "internalError": "Something went wrong."
+            "internalError": "Something went wrong.",
+            "jsonParse": "Could not parse JSON: {context}."
         },
         "httpServer": {
             "addressInUse": {
@@ -185,17 +190,15 @@
         },
         "mail": {
             "incompleteMessageData": {
-                "error": "Error: Incomplete message data."
+                "error": "Incomplete message data."
             },
             "failedSendingEmail": {
-                "error": "Error: Failed to send email"
+                "error": "Failed to send email."
             },
             "noMailServerAtAddress": {
-                "error": " - no mail server found at {domain}"
+                "error": " No mail server found at {domain}."
             },
-            "messageNotSent": {
-                "error": "Error: Message could not be sent"
-            }
+            "reason": " Reason: {reason}."
         },
         "models": {
             "subscriber": {
@@ -225,7 +228,7 @@
                 "missingContext": "missing context",
                 "onlyOneRolePerUserSupported": "Only one role per user is supported at the moment.",
                 "methodDoesNotSupportOwnerRole": "This method does not support assigning the owner role",
-                "passwordDoesNotComplyLength": "Your password must be at least 8 characters long.",
+                "passwordDoesNotComplyLength": "Your password must be at least {minLength} characters long.",
                 "notEnoughPermission": "You do not have permission to perform this action",
                 "noUserWithEnteredEmailAddr": "There is no user with that email address.",
                 "userIsInactive": "The user with that email address is inactive.",
@@ -255,7 +258,8 @@
                 "token": {
                     "noUserFound": "No user found",
                     "tokenNotFound": "Token not found"
-                }
+                },
+                "invalidDate": "Date format for `{key}` is invalid."
             },
             "plugins": {
                 "filter": {
@@ -332,6 +336,10 @@
             "job": {
                 "notFound": "Job not found.",
                 "publishInThePast": "Use the force flag to publish a post in the past."
+            },
+            "redirects": {
+                "missingFile": "Please select a JSON file.",
+                "invalidFile": "Please select a valid JSON file to import."
             },
             "settings": {
                 "problemFindingSetting": "Problem finding setting: {key}",

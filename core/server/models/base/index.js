@@ -125,15 +125,28 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         return validation.validateSchema(this.tableName, this.toJSON());
     },
 
+    /**
+     * Adding resources implies setting these properties on the server side
+     * - set `created_by` based on the context
+     * - set `updated_by` based on the context
+     * - the bookshelf `timestamps` plugin sets `created_at` and `updated_at`
+     *   - if plugin is disabled (e.g. import) we have a fallback condition
+     *
+     * Exceptions: internal context or importing
+     */
     onCreating: function onCreating(newObj, attr, options) {
         // id = 0 is still a valid value for external usage
         if (_.isUndefined(newObj.id) || _.isNull(newObj.id)) {
             newObj.setId();
         }
 
-        if (schema.tables[this.tableName].hasOwnProperty('created_by') && !this.get('created_by')) {
-            this.set('created_by', this.contextUser(options));
+        if (schema.tables[this.tableName].hasOwnProperty('created_by')) {
+            if (!options.importing || (options.importing && !this.get('created_by'))) {
+                this.set('created_by', this.contextUser(options));
+            }
         }
+
+        this.set('updated_by', this.contextUser(options));
 
         if (!newObj.get('created_at')) {
             newObj.set('created_at', new Date());
@@ -144,13 +157,37 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         }
     },
 
-    onSaving: function onSaving(newObj, attr, options) {
+    onSaving: function onSaving(newObj) {
         // Remove any properties which don't belong on the model
         this.attributes = this.pick(this.permittedAttributes());
         // Store the previous attributes so we can tell what was updated later
         this._updatedAttributes = newObj.previousAttributes();
+    },
 
+    /**
+     * Changing resources implies setting these properties on the server side
+     * - set `updated_by` based on the context
+     * - ensure `created_at` never changes
+     * - ensure `created_by` never changes
+     * - the bookshelf `timestamps` plugin sets `updated_at` automatically
+     *
+     * Exceptions:
+     *   - importing data
+     *   - internal context
+     *   - if no context
+     */
+    onUpdating: function onUpdating(newObj, attr, options) {
         this.set('updated_by', this.contextUser(options));
+
+        if (options && options.context && !options.internal && !options.importing) {
+            if (newObj.hasDateChanged('created_at', {beforeWrite: true})) {
+                newObj.set('created_at', this.previous('created_at'));
+            }
+
+            if (newObj.hasChanged('created_by')) {
+                newObj.set('created_by', this.previous('created_by'));
+            }
+        }
     },
 
     /**
@@ -172,23 +209,29 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
     },
 
     /**
-     * all supported databases (pg, sqlite, mysql) return different values
+     * all supported databases (sqlite, mysql) return different values
      *
      * sqlite:
      *   - knex returns a UTC String
-     * pg:
-     *   - has an active UTC session through knex and returns UTC Date
      * mysql:
      *   - knex wraps the UTC value into a local JS Date
      */
     fixDatesWhenFetch: function fixDates(attrs) {
-        var self = this;
+        var self = this, dateMoment;
 
         _.each(attrs, function each(value, key) {
             if (value !== null
                 && schema.tables[self.tableName].hasOwnProperty(key)
                 && schema.tables[self.tableName][key].type === 'dateTime') {
-                attrs[key] = moment(value).toDate();
+                dateMoment = moment(value);
+
+                // CASE: You are somehow able to store e.g. 0000-00-00 00:00:00
+                // Protect the code base and return the current date time.
+                if (dateMoment.isValid()) {
+                    attrs[key] = dateMoment.startOf('seconds').toDate();
+                } else {
+                    attrs[key] = moment().startOf('seconds').toDate();
+                }
             }
         });
 
@@ -363,7 +406,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
      * proper strings, see `format`.
      */
     sanitizeData: function sanitizeData(data) {
-        var tableName = _.result(this.prototype, 'tableName');
+        var tableName = _.result(this.prototype, 'tableName'), dateMoment;
 
         _.each(data, function (value, key) {
             if (value !== null
@@ -371,7 +414,16 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
                 && schema.tables[tableName][key].type === 'dateTime'
                 && typeof value === 'string'
             ) {
-                data[key] = moment(value).toDate();
+                dateMoment = moment(value);
+
+                // CASE: client sends `0000-00-00 00:00:00`
+                if (!dateMoment.isValid()) {
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.models.base.invalidDate', {key: key})
+                    });
+                }
+
+                data[key] = dateMoment.toDate();
             }
         });
 
@@ -385,7 +437,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
      * @return {Object} The filtered results of `options`.
      */
     filterOptions: function filterOptions(options, methodName) {
-        var permittedOptions = this.permittedOptions(methodName),
+        var permittedOptions = this.permittedOptions(methodName, options),
             filteredOptions = _.pick(options, permittedOptions);
 
         return filteredOptions;

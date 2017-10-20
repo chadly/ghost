@@ -411,6 +411,16 @@
                     "name": "Delete invites",
                     "action_type": "destroy",
                     "object_type": "invite"
+                },
+                {
+                    "name": "Download redirects",
+                    "action_type": "download",
+                    "object_type": "redirect"
+                },
+                {
+                    "name": "Upload redirects",
+                    "action_type": "upload",
+                    "object_type": "redirect"
                 }
             ]
         },
@@ -460,7 +470,8 @@
                     "role": "all",
                     "client": "all",
                     "subscriber": "all",
-                    "invite": "all"
+                    "invite": "all",
+                    "redirect": "all"
                 },
                 "Editor": {
                     "post": "all",
@@ -471,7 +482,8 @@
                     "role": "all",
                     "client": "all",
                     "subscriber": ["add"],
-                    "invite": "all"
+                    "invite": "all",
+                    "theme": ["browse"]
                 },
                 "Author": {
                     "post": ["browse", "read", "add"],
@@ -481,7 +493,8 @@
                     "user": ["browse", "read"],
                     "role": ["browse"],
                     "client": "all",
-                    "subscriber": ["add"]
+                    "subscriber": ["add"],
+                    "theme": ["browse"]
                 }
             }
         },

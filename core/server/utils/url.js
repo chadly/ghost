@@ -316,10 +316,13 @@ function urlFor(context, data, absolute) {
     } else if (context === 'api') {
         urlPath = getAdminUrl() || getBlogUrl();
 
-        // CASE: with or without protocol?
+        // CASE: with or without protocol? If your blog url (or admin url) is configured to http, it's still possible that e.g. nginx allows both https+http.
+        // So it depends how you serve your blog. The main focus here is to avoid cors problems.
         // @TODO: rename cors
         if (data && data.cors) {
-            urlPath = urlPath.replace(/^.*?:\/\//g, '//');
+            if (!urlPath.match(/^https:/)) {
+                urlPath = urlPath.replace(/^.*?:\/\//g, '//');
+            }
         }
 
         if (absolute) {
@@ -346,12 +349,28 @@ function isSSL(urlToParse) {
     return protocol === 'https:';
 }
 
+function redirect301(res, redirectUrl) {
+    res.set({'Cache-Control': 'public, max-age=' + config.get('caching:301:maxAge')});
+    return res.redirect(301, redirectUrl);
+}
+
+function redirectToAdmin(status, res, adminPath) {
+    var redirectUrl = urlJoin(urlFor('admin'), adminPath, '/');
+
+    if (status === 301) {
+        return redirect301(res, redirectUrl);
+    }
+    return res.redirect(redirectUrl);
+}
+
 module.exports.getProtectedSlugs = getProtectedSlugs;
 module.exports.getSubdir = getSubdir;
 module.exports.urlJoin = urlJoin;
 module.exports.urlFor = urlFor;
 module.exports.isSSL = isSSL;
 module.exports.urlPathForPost = urlPathForPost;
+module.exports.redirectToAdmin = redirectToAdmin;
+module.exports.redirect301 = redirect301;
 
 /**
  * If you request **any** image in Ghost, it get's served via

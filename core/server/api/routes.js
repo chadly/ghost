@@ -57,13 +57,12 @@ module.exports = function apiRoutes() {
     apiRouter.get('/users', mw.authenticatePublic, api.http(api.users.browse));
     apiRouter.get('/users/:id', mw.authenticatePublic, api.http(api.users.read));
     apiRouter.get('/users/slug/:slug', mw.authenticatePublic, api.http(api.users.read));
-    apiRouter.get('/users/email/:email', mw.authenticatePublic, api.http(api.users.read));
+    // NOTE: We don't expose any email addresses via the public api.
+    apiRouter.get('/users/email/:email', mw.authenticatePrivate, api.http(api.users.read));
 
     apiRouter.put('/users/password', mw.authenticatePrivate, api.http(api.users.changePassword));
     apiRouter.put('/users/owner', mw.authenticatePrivate, api.http(api.users.transferOwnership));
     apiRouter.put('/users/:id', mw.authenticatePrivate, api.http(api.users.edit));
-
-    apiRouter.post('/users', mw.authenticatePrivate, api.http(api.users.add));
     apiRouter.del('/users/:id', mw.authenticatePrivate, api.http(api.users.destroy));
 
     // ## Tags
@@ -190,6 +189,15 @@ module.exports = function apiRoutes() {
     apiRouter.get('/invites/:id', mw.authenticatePrivate, api.http(api.invites.read));
     apiRouter.post('/invites', mw.authenticatePrivate, api.http(api.invites.add));
     apiRouter.del('/invites/:id', mw.authenticatePrivate, api.http(api.invites.destroy));
+
+    // ## Redirects (JSON based)
+    apiRouter.get('/redirects/json', mw.authenticatePrivate, api.http(api.redirects.download));
+    apiRouter.post('/redirects/json',
+        mw.authenticatePrivate,
+        upload.single('redirects'),
+        validation.upload({type: 'redirects'}),
+        api.http(api.redirects.upload)
+    );
 
     return apiRouter;
 };

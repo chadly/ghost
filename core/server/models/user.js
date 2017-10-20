@@ -28,7 +28,7 @@ var _              = require('lodash'),
     Users;
 
 function validatePasswordLength(password) {
-    return validator.isLength(password, 8);
+    return validator.isLength(password, 10);
 }
 
 /**
@@ -146,17 +146,34 @@ User = ghostBookshelf.Model.extend({
          * Important:
          *   - Password hashing happens when we import a database
          *   - we do some pre-validation checks, because onValidate is called AFTER onSaving
+         *   - when importing, we set the password to a random uid and don't validate, just hash it and lock the user
+         *   - when importing with `importPersistUser` we check if the password is a bcrypt hash already and fall back to
+         *     normal behaviour if not (set random password, lock user, and hash password)
+         *   - no validations should run, when importing
          */
         if (self.isNew() || self.hasChanged('password')) {
             this.set('password', String(this.get('password')));
 
-            if (!validatePasswordLength(this.get('password'))) {
-                return Promise.reject(new errors.ValidationError({message: i18n.t('errors.models.user.passwordDoesNotComplyLength')}));
+            if (options.importing) {
+                // CASE: import with `importPersistUser` should always be an bcrypt password already,
+                // and won't re-hash or overwrite it.
+                // In case the password is not bcrypt hashed we fall back to the standard behaviour.
+                if (options.importPersistUser && this.get('password').match(/^\$2[ayb]\$.{56}$/i)) {
+                    return;
+                }
+
+                // always set password to a random uid when importing
+                this.set('password', utils.uid(50));
+
+                // lock users so they have to follow the password reset flow
+                if (this.get('status') !== 'inactive') {
+                    this.set('status', 'locked');
+                }
             }
 
-            // An import with importOptions supplied can prevent re-hashing a user password
-            if (options.importPersistUser) {
-                return;
+            // don't ever validate passwords when importing
+            if (!options.importing && !validatePasswordLength(this.get('password'))) {
+                return Promise.reject(new errors.ValidationError({message: i18n.t('errors.models.user.passwordDoesNotComplyLength', {minLength: 10})}));
             }
 
             tasks.hashPassword = (function hashPassword() {
@@ -192,12 +209,26 @@ User = ghostBookshelf.Model.extend({
         options = options || {};
 
         var attrs = ghostBookshelf.Model.prototype.toJSON.call(this, options);
+
         // remove password hash for security reasons
         delete attrs.password;
         delete attrs.ghost_auth_access_token;
 
+        // NOTE: We don't expose the email address for for external, app and public context.
+        // @TODO: Why? External+Public is actually the same context? Was also mentioned here https://github.com/TryGhost/Ghost/issues/9043
         if (!options || !options.context || (!options.context.user && !options.context.internal)) {
             delete attrs.email;
+        }
+
+        // We don't expose these fields when fetching data via the public API.
+        if (options && options.context && options.context.public) {
+            delete attrs.created_at;
+            delete attrs.created_by;
+            delete attrs.updated_at;
+            delete attrs.updated_by;
+            delete attrs.last_seen;
+            delete attrs.status;
+            delete attrs.ghost_auth_id;
         }
 
         return attrs;
@@ -295,8 +326,8 @@ User = ghostBookshelf.Model.extend({
     * @param {String} methodName The name of the method to check valid options for.
     * @return {Array} Keys allowed in the `options` hash of the model's method.
     */
-    permittedOptions: function permittedOptions(methodName) {
-        var options = ghostBookshelf.Model.permittedOptions(),
+    permittedOptions: function permittedOptions(methodName, options) {
+        var permittedOptionsToReturn = ghostBookshelf.Model.permittedOptions(),
 
             // whitelists for the `options` hash argument on methods, by method name.
             // these are the only options that can be passed to Bookshelf / Knex.
@@ -310,10 +341,18 @@ User = ghostBookshelf.Model.extend({
             };
 
         if (validOptions[methodName]) {
-            options = options.concat(validOptions[methodName]);
+            permittedOptionsToReturn = permittedOptionsToReturn.concat(validOptions[methodName]);
         }
 
-        return options;
+        // CASE: The `include` parameter is allowed when using the public API, but not the `roles` value.
+        // Otherwise we expose too much information.
+        if (options && options.context && options.context.public) {
+            if (options.include && options.include.indexOf('roles') !== -1) {
+                options.include.splice(options.include.indexOf('roles'), 1);
+            }
+        }
+
+        return permittedOptionsToReturn;
     },
 
     /**
@@ -328,7 +367,6 @@ User = ghostBookshelf.Model.extend({
     findOne: function findOne(dataToClone, options) {
         var query,
             status,
-            optInc,
             data = _.cloneDeep(dataToClone),
             lookupRole = data.role;
 
@@ -340,10 +378,9 @@ User = ghostBookshelf.Model.extend({
         status = data.status;
         delete data.status;
 
-        options = _.cloneDeep(options || {});
-        optInc = options.include;
-        options.withRelated = _.union(options.withRelated, options.include);
         data = this.filterData(data);
+        options = this.filterOptions(options, 'findOne');
+        options.withRelated = _.union(options.withRelated, options.include);
 
         // Support finding by role
         if (lookupRole) {
@@ -365,10 +402,6 @@ User = ghostBookshelf.Model.extend({
         } else if (status !== 'all') {
             query.query('where', {status: status});
         }
-
-        options = this.filterOptions(options, 'findOne');
-        delete options.include;
-        options.include = optInc;
 
         return query.fetch(options);
     },
@@ -533,7 +566,7 @@ User = ghostBookshelf.Model.extend({
             userData = this.filterData(data);
 
         if (!validatePasswordLength(userData.password)) {
-            return Promise.reject(new errors.ValidationError({message: i18n.t('errors.models.user.passwordDoesNotComplyLength')}));
+            return Promise.reject(new errors.ValidationError({message: i18n.t('errors.models.user.passwordDoesNotComplyLength', {minLength: 10})}));
         }
 
         options = this.filterOptions(options, 'setup');
@@ -575,7 +608,7 @@ User = ghostBookshelf.Model.extend({
         });
     },
 
-    permissible: function permissible(userModelOrId, action, context, loadedPermissions, hasUserPermission, hasAppPermission) {
+    permissible: function permissible(userModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasAppPermission) {
         var self = this,
             userModel = userModelOrId,
             origArgs;

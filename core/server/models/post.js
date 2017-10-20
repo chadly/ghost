@@ -664,23 +664,6 @@ Post = ghostBookshelf.Model.extend({
     findOne: function findOne(data, options) {
         options = options || {};
 
-        var withNext = _.includes(options.include, 'next'),
-            withPrev = _.includes(options.include, 'previous'),
-            nextRelations = _.transform(options.include, function (relations, include) {
-                if (include === 'next.tags') {
-                    relations.push('tags');
-                } else if (include === 'next.author') {
-                    relations.push('author');
-                }
-            }, []),
-            prevRelations = _.transform(options.include, function (relations, include) {
-            if (include === 'previous.tags') {
-                relations.push('tags');
-            } else if (include === 'previous.author') {
-                relations.push('author');
-            }
-        }, []);
-
         data = _.defaults(data || {}, {
             status: 'published'
         });
@@ -689,52 +672,9 @@ Post = ghostBookshelf.Model.extend({
             delete data.status;
         }
 
-        // Add related objects, excluding next and previous as they are not real db objects
-        options.withRelated = _.union(options.withRelated, _.pull(
-            [].concat(options.include),
-            'next', 'next.author', 'next.tags', 'previous', 'previous.author', 'previous.tags')
-        );
+        options.withRelated = _.union(options.withRelated, options.include);
 
-        return ghostBookshelf.Model.findOne.call(this, data, options).then(function then(post) {
-            if ((withNext || withPrev) && post && !post.page) {
-                var publishedAt = moment(post.get('published_at')).format('YYYY-MM-DD HH:mm:ss'),
-                    prev,
-                    next;
-
-                if (withNext) {
-                    next = Post.forge().query(function queryBuilder(qb) {
-                        qb.where('status', '=', 'published')
-                            .andWhere('page', '=', 0)
-                            .andWhere('published_at', '>', publishedAt)
-                            .orderBy('published_at', 'asc')
-                            .limit(1);
-                    }).fetch({withRelated: nextRelations});
-                }
-
-                if (withPrev) {
-                    prev = Post.forge().query(function queryBuilder(qb) {
-                        qb.where('status', '=', 'published')
-                            .andWhere('page', '=', 0)
-                            .andWhere('published_at', '<', publishedAt)
-                            .orderBy('published_at', 'desc')
-                            .limit(1);
-                    }).fetch({withRelated: prevRelations});
-                }
-
-                return Promise.join(next, prev)
-                    .then(function then(nextAndPrev) {
-                        if (nextAndPrev[0]) {
-                            post.relations.next = nextAndPrev[0];
-                        }
-                        if (nextAndPrev[1]) {
-                            post.relations.previous = nextAndPrev[1];
-                        }
-                        return post;
-                    });
-            }
-
-            return post;
-        });
+        return ghostBookshelf.Model.findOne.call(this, data, options);
     },
 
     /**
@@ -810,7 +750,7 @@ Post = ghostBookshelf.Model.extend({
             });
     }),
 
-    permissible: function permissible(postModelOrId, action, context, loadedPermissions, hasUserPermission, hasAppPermission) {
+    permissible: function permissible(postModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasAppPermission) {
         var self = this,
             postModel = postModelOrId,
             origArgs;
@@ -830,8 +770,23 @@ Post = ghostBookshelf.Model.extend({
             });
         }
 
-        if (postModel) {
-            // If this is the author of the post, allow it.
+        function isChanging(attr) {
+            return unsafeAttrs[attr] && unsafeAttrs[attr] !== postModel.get(attr);
+        }
+
+        function actorIsAuthor(loadedPermissions) {
+            return loadedPermissions.user && _.some(loadedPermissions.user.roles, {name: 'Author'});
+        }
+
+        function isOwner() {
+            return unsafeAttrs.author_id && unsafeAttrs.author_id === context.user;
+        }
+
+        if (actorIsAuthor(loadedPermissions) && action === 'edit' && isChanging('author_id')) {
+            hasUserPermission = false;
+        } else if (actorIsAuthor(loadedPermissions) && action === 'add') {
+            hasUserPermission = isOwner();
+        } else if (postModel) {
             hasUserPermission = hasUserPermission || context.user === postModel.get('author_id');
         }
 
