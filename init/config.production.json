@@ -1,0 +1,13 @@
+{
+	"database": {
+		"client": "mysql",
+		"connection": {
+			"host": "127.0.0.1",
+			"user": "azure",
+			"password": "replace-password",
+			"database": "ghost",
+			"charset": "utf8",
+			"port": "replace-port"
+		}
+	}
+}
