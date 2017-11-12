@@ -48,11 +48,11 @@ exec=$(sed -e "s/replace-password/"$database_pass"/g" -e "s/replace-port/"$datab
 log "Check whether DB is online and get the location of the bin."
 result=$(node init/checkDatabase.js)
 
-if [ "$result" = "false" ]
-then
-    log "Database not found, fixing that shit!"
-    bin=$(node init/getDatabaseBinary.js)
-    exec=$("$bin" -P$database_port -uazure -p"$database_pass" < init/cleanDatabase.sql)
-else
-    log "Database is initialized already!"
-fi
+#if [ "$result" = "false" ]
+#then
+#    log "Database not found, fixing that shit!"
+#    bin=$(node init/getDatabaseBinary.js)
+#    exec=$("$bin" -P$database_port -uazure -p"$database_pass" < init/cleanDatabase.sql)
+#else
+#    log "Database is initialized already!"
+#fi
