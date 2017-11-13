@@ -1,0 +1,66 @@
+{
+    "parameters": {
+        "AppServiceName": {
+            "type": "string",
+            "defaultValue": "PublicBlog"
+        },
+        "siteUrl": {
+            "type": "string",
+            "defaultValue": "https://example.blog/"
+        },
+        "ServicePlanName": {
+            "type": "string",
+            "defaultValue": "ServicePlan"
+        }
+    },
+    "variables": {
+        "name": "[parameters('AppServiceName)]",
+        "hostingPlanName": "[parameters('ServicePlanName')]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2016-03-01",
+            "name": "[variables('name')]",
+            "type": "Microsoft.Web/sites",
+            "location": "[resourceGroup().location]", 
+            "properties": {
+                "name": "[variables('name')]",
+                "serverFarmId":"[variables('hostingPlanName')]",                
+                "siteConfig": {
+                    "localMySqlEnabled": true
+                }
+            },
+            "resources": [
+                {
+                    "type": "config",
+                    "name": "appsettings",
+                    "apiVersion": "2015-08-01",
+                    "properties": {
+                        "url": "[parameters('siteUrl')]",
+                        "WEBSITE_NODE_DEFAULT_VERSION": "8.7.0",
+                        "POST_DEPLOYMENT_ACTION":"bash initialize.sh"
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('name'))]"
+                    ]
+                },
+                {
+                    "type": "sourcecontrols",
+                    "apiVersion": "2015-08-01",
+                    "name": "web",
+                    "properties": {
+                        "RepoUrl": "https://github.com/duijvelshoff/Azure-Ghost",
+                        "branch": "azure",
+                        "IsManualIntegration": "true"
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites/', variables('name'))]",
+                        "[resourceId('Microsoft.Web/Sites/config', variables('name'), 'appsettings')]"
+                    ]
+                }
+            ]
+        }
+    ],
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0"
+}
