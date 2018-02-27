@@ -1,48 +1,44 @@
 // # DB API
 // API for DB operations
 var Promise = require('bluebird'),
-    path = require('path'),
-    fs = require('fs'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
     exporter = require('../data/export'),
     importer = require('../data/importer'),
     backupDatabase = require('../data/db/backup'),
     models = require('../models'),
-    config = require('../config'),
-    errors = require('../errors'),
-    utilsUrl = require('../utils/url'),
+    common = require('../lib/common'),
     docName = 'db',
     db;
 
 /**
  * ## DB API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 db = {
     /**
      * ### Archive Content
-     * Generate the JSON to export - for Moya only
+     * Generate the JSON to export
      *
      * @public
      * @returns {Promise} Ghost Export JSON format
      */
-    backupContent: function () {
-        var props = {
-            data: exporter.doExport(),
-            filename: exporter.fileName()
-        };
+    backupContent: function (options) {
+        var tasks;
 
-        return Promise.props(props)
-            .then(function successMessage(exportResult) {
-                var filename = path.resolve(utilsUrl.urlJoin(config.get('paths').contentPath, 'data', exportResult.filename));
+        options = options || {};
 
-                return Promise.promisify(fs.writeFile)(filename, JSON.stringify(exportResult.data))
-                    .then(function () {
-                        return filename;
-                    });
-            });
+        function jsonResponse(filename) {
+            return {db: [{filename: filename}]};
+        }
+
+        tasks = [
+            backupDatabase,
+            jsonResponse
+        ];
+
+        return pipeline(tasks, options);
     },
     /**
      * ### Export Content
@@ -62,12 +58,12 @@ db = {
             return exporter.doExport().then(function (exportedData) {
                 return {db: [exportedData]};
             }).catch(function (err) {
-                return Promise.reject(new errors.GhostError({err: err}));
+                return Promise.reject(new common.errors.GhostError({err: err}));
             });
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'exportContent'),
+            localUtils.handlePermissions(docName, 'exportContent'),
             exportContent
         ];
 
@@ -94,7 +90,7 @@ db = {
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'importContent'),
+            localUtils.handlePermissions(docName, 'importContent'),
             importContent
         ];
 
@@ -123,13 +119,13 @@ db = {
             return Promise.each(collections, function then(Collection) {
                 return Collection.invokeThen('destroy', queryOpts);
             }).return({db: []})
-            .catch(function (err) {
-                throw new errors.GhostError({err: err});
-            });
+                .catch(function (err) {
+                    throw new common.errors.GhostError({err: err});
+                });
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'deleteAllContent'),
+            localUtils.handlePermissions(docName, 'deleteAllContent'),
             backupDatabase,
             deleteContent
         ];

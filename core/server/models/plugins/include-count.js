@@ -1,4 +1,6 @@
-var _ = require('lodash');
+var _debug = require('ghost-ignition').debug._base,
+    debug = _debug('ghost-query'),
+    _ = require('lodash');
 
 module.exports = function (Bookshelf) {
     var modelProto = Bookshelf.Model.prototype,
@@ -7,7 +9,7 @@ module.exports = function (Bookshelf) {
 
     countQueryBuilder = {
         tags: {
-            posts: function addPostCountToTags(model) {
+            posts: function addPostCountToTags(model, options) {
                 model.query('columns', 'tags.*', function (qb) {
                     qb.count('posts.id')
                         .from('posts')
@@ -15,7 +17,7 @@ module.exports = function (Bookshelf) {
                         .whereRaw('posts_tags.tag_id = tags.id')
                         .as('count__posts');
 
-                    if (model.isPublicContext()) {
+                    if (options.context && options.context.public) {
                         // @TODO use the filter behavior for posts
                         qb.andWhere('posts.page', '=', false);
                         qb.andWhere('posts.status', '=', 'published');
@@ -24,14 +26,14 @@ module.exports = function (Bookshelf) {
             }
         },
         users: {
-            posts: function addPostCountToTags(model) {
+            posts: function addPostCountToTags(model, options) {
                 model.query('columns', 'users.*', function (qb) {
                     qb.count('posts.id')
                         .from('posts')
                         .whereRaw('posts.author_id = users.id')
                         .as('count__posts');
 
-                    if (model.isPublicContext()) {
+                    if (options.context && options.context.public) {
                         // @TODO use the filter behavior for posts
                         qb.andWhere('posts.page', '=', false);
                         qb.andWhere('posts.status', '=', 'published');
@@ -49,19 +51,21 @@ module.exports = function (Bookshelf) {
 
             var tableName = _.result(this, 'tableName');
 
-            if (options.include && options.include.indexOf('count.posts') > -1) {
-                // remove post_count from withRelated and include
+            if (options.withRelated && options.withRelated.indexOf('count.posts') > -1) {
+                // remove post_count from withRelated
                 options.withRelated = _.pull([].concat(options.withRelated), 'count.posts');
 
                 // Call the query builder
-                countQueryBuilder[tableName].posts(this);
+                countQueryBuilder[tableName].posts(this, options);
             }
         },
         fetch: function () {
             this.addCounts.apply(this, arguments);
 
-            if (this.debug) {
-                console.log('QUERY', this.query().toQuery());
+            // Useful when debugging no. database queries, GQL, etc
+            // To output this, use DEBUG=ghost:*,ghost-query
+            if (_debug.enabled('ghost-query')) {
+                debug('QUERY', this.query().toQuery());
             }
 
             // Call parent fetch
@@ -70,16 +74,20 @@ module.exports = function (Bookshelf) {
         fetchAll: function () {
             this.addCounts.apply(this, arguments);
 
-            if (this.debug) {
-                console.log('QUERY', this.query().toQuery());
+            // Useful when debugging no. database queries, GQL, etc
+            // To output this, use DEBUG=ghost:*,ghost-query
+            if (_debug.enabled('ghost-query')) {
+                debug('QUERY', this.query().toQuery());
             }
 
             // Call parent fetchAll
             return modelProto.fetchAll.apply(this, arguments);
         },
 
-        finalize: function (attrs) {
-            var countRegex = /^(count)(__)(.*)$/;
+        serialize: function serialize(options) {
+            var attrs = modelProto.serialize.call(this, options),
+                countRegex = /^(count)(__)(.*)$/;
+
             _.forOwn(attrs, function (value, key) {
                 var match = key.match(countRegex);
                 if (match) {

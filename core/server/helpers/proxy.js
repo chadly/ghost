@@ -1,9 +1,8 @@
 // This file defines everything that helpers "require"
 // With the exception of modules like lodash, Bluebird
 // We can later refactor to enforce this something like we do in apps
-var hbs = require('../themes/engine'),
-    _ = require('lodash'),
-    settingsCache = require('../settings/cache'),
+var hbs = require('../services/themes/engine'),
+    settingsCache = require('../services/settings/cache'),
     config = require('../config');
 
 // Direct requires:
@@ -20,13 +19,15 @@ module.exports = {
 
     // TODO: Expose less of the API to make this safe
     api: require('../api'),
+    models: require('../models'),
+
     // TODO: Only expose "get"
     settingsCache: settingsCache,
 
     // These 3 are kind of core and required all the time
-    errors: require('../errors'),
-    i18n: require('../i18n'),
-    logging: require('../logging'),
+    errors: require('../lib/common/errors'),
+    i18n: require('../lib/common/i18n'),
+    logging: require('../lib/common/logging'),
 
     // This is used to detect if "isPost" is true in prevNext.
     checks: require('../data/schema').checks,
@@ -41,7 +42,7 @@ module.exports = {
     },
 
     // Labs utils for enabling/disabling helpers
-    labs: require('../utils/labs'),
+    labs: require('../services/labs'),
 
     // System for apps to hook into one day maybe
     filters: require('../filters'),
@@ -61,21 +62,8 @@ module.exports = {
     templates: require('./template'),
 
     // Various utils, needs cleaning up / simplifying
-    socialUrls: require('../utils/social-urls'),
-    blogIcon: require('../utils/blog-icon'),
-    url: require('../utils').url,
-    utils: {
-        findKey: function findKey(key /* ...objects... */) {
-            var objects = Array.prototype.slice.call(arguments, 1);
-
-            return _.reduceRight(objects, function (result, object) {
-                if (object && _.has(object, key) && !_.isEmpty(object[key])) {
-                    result = object[key];
-                }
-
-                return result;
-            }, null);
-        }
-    },
-    visibility: require('../utils/visibility')
+    socialUrls: require('../lib/social/urls'),
+    blogIcon: require('../lib/image/blog-icon'),
+    url: require('../services/url').utils,
+    localUtils: require('./utils')
 };

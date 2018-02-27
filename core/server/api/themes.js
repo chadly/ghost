@@ -3,21 +3,18 @@
 var debug = require('ghost-ignition').debug('api:themes'),
     Promise = require('bluebird'),
     fs = require('fs-extra'),
-    apiUtils = require('./utils'),
-    errors = require('../errors'),
-    events = require('../events'),
-    i18n = require('../i18n'),
-    logging = require('../logging'),
+    localUtils = require('./utils'),
+    common = require('../lib/common'),
     settingsModel = require('../models/settings').Settings,
-    settingsCache = require('../settings/cache'),
-    themeUtils = require('../themes'),
+    settingsCache = require('../services/settings/cache'),
+    themeUtils = require('../services/themes'),
     themeList = themeUtils.list,
     themes;
 
 /**
  * ## Themes API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 themes = {
     /**
@@ -27,8 +24,8 @@ themes = {
      * in the PSM to be able to choose a custom post template.
      */
     browse: function browse(options) {
-        return apiUtils
-            // Permissions
+        return localUtils
+        // Permissions
             .handlePermissions('themes', 'browse')(options)
             // Main action
             .then(function makeApiResult() {
@@ -46,16 +43,16 @@ themes = {
             loadedTheme,
             checkedTheme;
 
-        return apiUtils
-            // Permissions
+        return localUtils
+        // Permissions
             .handlePermissions('themes', 'activate')(options)
             // Validation
             .then(function validateTheme() {
                 loadedTheme = themeList.get(themeName);
 
                 if (!loadedTheme) {
-                    return Promise.reject(new errors.ValidationError({
-                        message: i18n.t('notices.data.validation.index.themeCannotBeActivated', {themeName: themeName}),
+                    return Promise.reject(new common.errors.ValidationError({
+                        message: common.i18n.t('notices.data.validation.index.themeCannotBeActivated', {themeName: themeName}),
                         context: 'active_theme'
                     }));
                 }
@@ -94,11 +91,11 @@ themes = {
 
         // check if zip name is casper.zip
         if (zip.name === 'casper.zip') {
-            throw new errors.ValidationError({message: i18n.t('errors.api.themes.overrideCasper')});
+            throw new common.errors.ValidationError({message: common.i18n.t('errors.api.themes.overrideCasper')});
         }
 
-        return apiUtils
-            // Permissions
+        return localUtils
+        // Permissions
             .handlePermissions('themes', 'add')(options)
             // Validation
             .then(function validateTheme() {
@@ -118,7 +115,6 @@ themes = {
                 }
             })
             .then(function storeNewTheme() {
-                events.emit('theme.uploaded', zip.shortName);
                 // store extracted theme
                 return themeUtils.storage.save({
                     name: zip.shortName,
@@ -146,18 +142,18 @@ themes = {
                 // @TODO we should probably do this as part of saving the theme
                 // remove zip upload from multer
                 // happens in background
-                Promise.promisify(fs.remove)(zip.path)
+                fs.remove(zip.path)
                     .catch(function (err) {
-                        logging.error(new errors.GhostError({err: err}));
+                        common.logging.error(new common.errors.GhostError({err: err}));
                     });
 
                 // @TODO we should probably do this as part of saving the theme
                 // remove extracted dir from gscan
                 // happens in background
                 if (checkedTheme) {
-                    Promise.promisify(fs.remove)(checkedTheme.path)
+                    fs.remove(checkedTheme.path)
                         .catch(function (err) {
-                            logging.error(new errors.GhostError({err: err}));
+                            common.logging.error(new common.errors.GhostError({err: err}));
                         });
                 }
             });
@@ -168,14 +164,13 @@ themes = {
             theme = themeList.get(themeName);
 
         if (!theme) {
-            return Promise.reject(new errors.BadRequestError({message: i18n.t('errors.api.themes.invalidRequest')}));
+            return Promise.reject(new common.errors.BadRequestError({message: common.i18n.t('errors.api.themes.invalidRequest')}));
         }
 
-        return apiUtils
-            // Permissions
+        return localUtils
+        // Permissions
             .handlePermissions('themes', 'read')(options)
             .then(function sendTheme() {
-                events.emit('theme.downloaded', themeName);
                 return themeUtils.storage.serve({
                     name: themeName
                 });
@@ -190,23 +185,23 @@ themes = {
         var themeName = options.name,
             theme;
 
-        return apiUtils
-            // Permissions
+        return localUtils
+        // Permissions
             .handlePermissions('themes', 'destroy')(options)
             // Validation
             .then(function validateTheme() {
                 if (themeName === 'casper') {
-                    throw new errors.ValidationError({message: i18n.t('errors.api.themes.destroyCasper')});
+                    throw new common.errors.ValidationError({message: common.i18n.t('errors.api.themes.destroyCasper')});
                 }
 
                 if (themeName === settingsCache.get('active_theme')) {
-                    throw new errors.ValidationError({message: i18n.t('errors.api.themes.destroyActive')});
+                    throw new common.errors.ValidationError({message: common.i18n.t('errors.api.themes.destroyActive')});
                 }
 
                 theme = themeList.get(themeName);
 
                 if (!theme) {
-                    throw new errors.NotFoundError({message: i18n.t('errors.api.themes.themeDoesNotExist')});
+                    throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.themes.themeDoesNotExist')});
                 }
 
                 // Actually do the deletion here
@@ -215,7 +210,6 @@ themes = {
             // And some extra stuff to maintain state here
             .then(function deleteTheme() {
                 themeList.del(themeName);
-                events.emit('theme.deleted', themeName);
                 // Delete returns an empty 204 response
             });
     }

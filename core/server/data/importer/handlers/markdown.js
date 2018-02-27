@@ -1,7 +1,7 @@
-var _       = require('lodash'),
+var _ = require('lodash'),
     Promise = require('bluebird'),
-    fs      = require('fs-extra'),
-    moment  = require('moment'),
+    fs = require('fs-extra'),
+    moment = require('moment'),
 
     featuredImageRegex = /^(!\[]\(([^)]*?)\)\s+)(?=#)/,
     titleRegex = /^#\s?([\w\W]*?)(?=\n)/,
@@ -87,13 +87,12 @@ MarkdownHandler = {
     directories: [],
 
     loadFile: function (files, startDir) {
-        /*jshint unused:false */
         var startDirRegex = startDir ? new RegExp('^' + startDir + '/') : new RegExp(''),
             posts = [],
             ops = [];
 
         _.each(files, function (file) {
-            ops.push(Promise.promisify(fs.readFile)(file.path).then(function (content) {
+            ops.push(fs.readFile(file.path).then(function (content) {
                 // normalize the file name
                 file.name = file.name.replace(startDirRegex, '');
                 // don't include deleted posts

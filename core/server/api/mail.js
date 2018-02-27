@@ -2,11 +2,11 @@
 // API for sending Mail
 
 var Promise = require('bluebird'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
     models = require('../models'),
-    i18n = require('../i18n'),
-    mail = require('../mail'),
+    common = require('../lib/common'),
+    mail = require('../services/mail'),
     notificationsAPI = require('./notifications'),
     docName = 'mail',
     mailer,
@@ -23,14 +23,15 @@ function sendMail(object) {
     return mailer.send(object.mail[0].message).catch(function (err) {
         if (mailer.state.usingDirect) {
             notificationsAPI.add(
-                {notifications: [{
-                    type: 'warn',
-                    message: [
-                        i18n.t('warnings.index.unableToSendEmail'),
-                        i18n.t('common.seeLinkForInstructions',
-                            {link: '<a href=\'https://docs.ghost.org/v1/docs/mail-config\' target=\'_blank\'>Checkout our mail configuration docs!</a>'})
-                    ].join(' ')
-                }]},
+                {
+                    notifications: [{
+                        type: 'warn',
+                        message: [
+                            common.i18n.t('warnings.index.unableToSendEmail'),
+                            common.i18n.t('common.seeLinkForInstructions', {link: 'https://docs.ghost.org/v1/docs/mail-config'})
+                        ].join(' ')
+                    }]
+                },
                 {context: {internal: true}}
             );
         }
@@ -42,7 +43,7 @@ function sendMail(object) {
 /**
  * ## Mail API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  * @typedef Mail
  * @param mail
  */
@@ -83,7 +84,7 @@ apiMail = {
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'send'),
+            localUtils.handlePermissions(docName, 'send'),
             send,
             formatResponse
         ];
@@ -120,7 +121,7 @@ apiMail = {
                     mail: [{
                         message: {
                             to: result.get('email'),
-                            subject: i18n.t('common.api.mail.testGhostEmail'),
+                            subject: common.i18n.t('common.api.mail.testGhostEmail'),
                             html: content.html,
                             text: content.text
                         }

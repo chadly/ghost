@@ -1,12 +1,11 @@
 var Promise = require('bluebird'),
     _ = require('lodash'),
     moment = require('moment'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
     models = require('../models'),
     config = require('../config'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
+    common = require('../lib/common'),
     postsAPI = require('../api/posts');
 
 /**
@@ -29,13 +28,13 @@ exports.publishPost = function publishPost(object, options) {
 
     // CASE: only the scheduler client is allowed to publish (hardcoded because of missing client permission system)
     if (!options.context || !options.context.client || options.context.client !== 'ghost-scheduler') {
-        return Promise.reject(new errors.NoPermissionError({message: i18n.t('errors.permissions.noPermissionToAction')}));
+        return Promise.reject(new common.errors.NoPermissionError({message: common.i18n.t('errors.permissions.noPermissionToAction')}));
     }
 
     options.context = {internal: true};
 
     return pipeline([
-        apiUtils.validate('posts', {opts: apiUtils.idDefaultOptions}),
+        localUtils.validate('posts', {opts: localUtils.idDefaultOptions}),
         function (cleanOptions) {
             cleanOptions.status = 'scheduled';
 
@@ -43,7 +42,7 @@ exports.publishPost = function publishPost(object, options) {
                 cleanOptions.transacting = transacting;
                 cleanOptions.forUpdate = true;
 
-                // CASE: extend allowed options, see api/utils.js
+                // CASE: extend allowed options, see api/zip-folder.js
                 cleanOptions.opts = ['forUpdate', 'transacting'];
 
                 return postsAPI.read(cleanOptions)
@@ -52,15 +51,17 @@ exports.publishPost = function publishPost(object, options) {
                         publishedAtMoment = moment(post.published_at);
 
                         if (publishedAtMoment.diff(moment(), 'minutes') > publishAPostBySchedulerToleranceInMinutes) {
-                            return Promise.reject(new errors.NotFoundError({message: i18n.t('errors.api.job.notFound')}));
+                            return Promise.reject(new common.errors.NotFoundError({message: common.i18n.t('errors.api.job.notFound')}));
                         }
 
                         if (publishedAtMoment.diff(moment(), 'minutes') < publishAPostBySchedulerToleranceInMinutes * -1 && object.force !== true) {
-                            return Promise.reject(new errors.NotFoundError({message: i18n.t('errors.api.job.publishInThePast')}));
+                            return Promise.reject(new common.errors.NotFoundError({message: common.i18n.t('errors.api.job.publishInThePast')}));
                         }
 
-                        return postsAPI.edit({
-                            posts: [{status: 'published'}]},
+                        return postsAPI.edit(
+                            {
+                                posts: [{status: 'published'}]
+                            },
                             _.pick(cleanOptions, ['context', 'id', 'transacting', 'forUpdate', 'opts'])
                         );
                     });
@@ -78,7 +79,7 @@ exports.getScheduledPosts = function readPosts(options) {
     options.context = {internal: true};
 
     return pipeline([
-        apiUtils.validate('posts', {opts: ['from', 'to']}),
+        localUtils.validate('posts', {opts: ['from', 'to']}),
         function (cleanOptions) {
             cleanOptions.filter = 'status:scheduled';
             cleanOptions.columns = ['id', 'published_at', 'created_at'];

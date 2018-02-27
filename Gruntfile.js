@@ -6,24 +6,24 @@
 //
 // **Debug tip:** If you have any problems with any Grunt tasks, try running them with the `--verbose` command
 
-// jshint unused: false
-var overrides      = require('./core/server/overrides'),
-    config         = require('./core/server/config'),
-    utils          = require('./core/server/utils'),
-    _              = require('lodash'),
-    chalk          = require('chalk'),
-    fs             = require('fs-extra'),
-    KnexMigrator   = require('knex-migrator'),
+require('./core/server/overrides');
+
+var config = require('./core/server/config'),
+    urlService = require('./core/server/services/url'),
+    _ = require('lodash'),
+    chalk = require('chalk'),
+    fs = require('fs-extra'),
+    KnexMigrator = require('knex-migrator'),
     knexMigrator = new KnexMigrator({
         knexMigratorFilePath: config.get('paths:appRoot')
     }),
 
-    path           = require('path'),
+    path = require('path'),
 
-    escapeChar     = process.platform.match(/^win/) ? '^' : '\\',
-    cwd            = process.cwd().replace(/( |\(|\))/g, escapeChar + '$1'),
+    escapeChar = process.platform.match(/^win/) ? '^' : '\\',
+    cwd = process.cwd().replace(/( |\(|\))/g, escapeChar + '$1'),
     buildDirectory = path.resolve(cwd, '.build'),
-    distDirectory  = path.resolve(cwd, '.dist'),
+    distDirectory = path.resolve(cwd, '.dist'),
 
     // ## Grunt configuration
 
@@ -47,7 +47,7 @@ var overrides      = require('./core/server/overrides'),
             pkg: grunt.file.readJSON('package.json'),
 
             clientFiles: [
-                'server/admin/views/default.html',
+                'server/web/admin/views/default.html',
                 'built/assets/ghost.js',
                 'built/assets/ghost.css',
                 'built/assets/vendor.js',
@@ -68,8 +68,8 @@ var overrides      = require('./core/server/overrides'),
                     }
                 },
                 express: {
-                    files:  ['core/ghost-server.js', 'core/server/**/*.js', 'config.*.json', '!config.testing.json'],
-                    tasks:  ['express:dev'],
+                    files: ['core/ghost-server.js', 'core/server/**/*.js', 'config.*.json', '!config.testing.json'],
+                    tasks: ['express:dev'],
                     options: {
                         nospawn: true,
                         livereload: true
@@ -95,42 +95,31 @@ var overrides      = require('./core/server/overrides'),
                 }
             },
 
-            // ### grunt-contrib-jshint
+            // ### grunt-eslint
             // Linting rules, run as part of `grunt validate`. See [grunt validate](#validate) and its subtasks for
             // more information.
-            jshint: {
-                options: {
-                    jshintrc: '.jshintrc'
-                },
-
-                server: [
-                    '*.js',
-                    '!config.*.json', // note: i added this, do we want this linted?
-                    'core/*.js',
-                    'core/server/**/*.js',
-                    'core/test/**/*.js',
-                    '!core/test/coverage/**',
-                    '!core/server/public/**/*.js'
-                ]
-            },
-
-            jscs: {
-                options: {
-                    config: true
-                },
-
+            eslint: {
                 server: {
-                    files: {
-                        src: [
-                            '*.js',
-                            '!config.*.json', // note: i added this, do we want this linted?
-                            'core/*.js',
-                            'core/server/**/*.js',
-                            'core/test/**/*.js',
-                            '!core/test/coverage/**',
-                            '!core/server/public/**/*.js'
-                        ]
-                    }
+                    options: {
+                        config: '.eslintrc.json'
+                    },
+                    src: [
+                        '*.js',
+                        'core/*.js',
+                        'core/server/*.js',
+                        'core/server/**/*.js',
+                        '!core/server/public/**/*.js'
+                    ]
+                },
+                test: {
+                    options: {
+                        config: './core/test/.eslintrc.json'
+                    },
+                    src: [
+                        'core/test/*.js',
+                        'core/test/**/*.js',
+                        '!core/test/coverage/**'
+                    ]
                 }
             },
 
@@ -143,22 +132,21 @@ var overrides      = require('./core/server/overrides'),
                     reporter: grunt.option('reporter') || 'spec',
                     timeout: '30000',
                     save: grunt.option('reporter-output'),
-                    require: ['core/server/overrides']
+                    require: ['core/server/overrides'],
+                    exit: true
                 },
 
                 // #### All Unit tests
                 unit: {
                     src: [
-                        'core/test/unit/**/*_spec.js',
-                        'core/server/apps/**/tests/*_spec.js'
+                        'core/test/unit/**/*_spec.js'
                     ]
                 },
 
                 // #### All Integration tests
                 integration: {
                     src: [
-                        'core/test/integration/**/*_spec.js',
-                        'core/test/integration/*_spec.js'
+                        'core/test/integration/**/*_spec.js'
                     ]
                 },
 
@@ -187,27 +175,25 @@ var overrides      = require('./core/server/overrides'),
                 coverage: {
                     // they can also have coverage generated for them & the order doesn't matter
                     src: [
-                        'core/test/unit',
-                        'core/server/apps'
+                        'core/test/unit'
                     ],
                     options: {
                         mask: '**/*_spec.js',
                         coverageFolder: 'core/test/coverage/unit',
-                        mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides'],
+                        mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides', '--exit'],
                         excludes: ['core/client', 'core/server/built']
                     }
                 },
                 coverage_all: {
                     src: [
                         'core/test/integration',
-                        'core/server/apps',
                         'core/test/functional',
                         'core/test/unit'
                     ],
                     options: {
                         coverageFolder: 'core/test/coverage/all',
                         mask: '**/*_spec.js',
-                        mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides'],
+                        mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides', '--exit'],
                         excludes: ['core/client', 'core/server/built']
                     }
 
@@ -244,8 +230,8 @@ var overrides      = require('./core/server/overrides'),
                         var upstream = grunt.option('upstream') || process.env.GHOST_UPSTREAM || 'upstream';
                         grunt.log.writeln('Pulling down the latest master from ' + upstream);
                         return 'git checkout master; git pull ' + upstream + ' master; ' +
-                        'yarn; git submodule foreach "git checkout master && git pull ' +
-                        upstream + ' master"';
+                            'yarn; git submodule foreach "git checkout master && git pull ' +
+                            upstream + ' master"';
                     }
                 },
 
@@ -274,8 +260,7 @@ var overrides      = require('./core/server/overrides'),
             clean: {
                 built: {
                     src: [
-                        'core/built/**',
-                        'core/client/dist/**'
+                        'core/built/**'
                     ]
                 },
                 release: {
@@ -364,7 +349,7 @@ var overrides      = require('./core/server/overrides'),
 
                 watch: {
                     projects: {
-                        'core/client': ['shell:ember:watch', '--live-reload-base-url="' + utils.url.getSubdir() + '/ghost/"']
+                        'core/client': ['shell:ember:watch', '--live-reload-base-url="' + urlService.utils.getSubdir() + '/ghost/"']
                     }
                 }
             },
@@ -407,7 +392,7 @@ var overrides      = require('./core/server/overrides'),
         grunt.registerTask('help',
             'Outputs help information if you type `grunt help` instead of `grunt --help`',
             function () {
-                console.log('Type `grunt --help` to get the details of available grunt tasks.');
+                grunt.log.writeln('Type `grunt --help` to get the details of available grunt tasks.');
             });
 
         // ### Documentation
@@ -520,9 +505,9 @@ var overrides      = require('./core/server/overrides'),
 
         // ### Lint
         //
-        // `grunt lint` will run the linter and the code style checker so you can make sure your code is pretty
-        grunt.registerTask('lint', 'Run the code style checks and linter for server',
-            ['jshint', 'jscs']
+        // `grunt lint` will run the linter
+        grunt.registerTask('lint', 'Run the code style checks for server & tests',
+            ['eslint']
         );
 
         // ### test-setup *(utility)(
@@ -634,11 +619,11 @@ var overrides      = require('./core/server/overrides'),
         grunt.registerTask('master-warn',
             'Outputs a warning to runners of grunt prod, that master shouldn\'t be used for live blogs',
             function () {
-                console.log(chalk.red(
+                grunt.log.writeln(chalk.red(
                     'Use the ' + chalk.bold('stable') + ' branch for live blogs. '
                     + chalk.bold.underline('Never') + ' master!'
                 ));
-                console.log('>', 'Always two there are, no more, no less. A master and a ' + chalk.bold('stable') + '.');
+                grunt.log.writeln('>', 'Always two there are, no more, no less. A master and a ' + chalk.bold('stable') + '.');
             });
 
         // ## Building assets
@@ -707,11 +692,11 @@ var overrides      = require('./core/server/overrides'),
         // Note that the current implementation of watch only works with casper, not other themes.
         grunt.registerTask('dev', 'Dev Mode; watch files and restart server on changes', function () {
             if (grunt.option('client')) {
-                grunt.task.run(['bgShell:client']);
+                grunt.task.run(['clean:built', 'bgShell:client']);
             } else if (grunt.option('server')) {
                 grunt.task.run(['express:dev', 'watch']);
             } else {
-                grunt.task.run(['bgShell:client', 'express:dev', 'watch']);
+                grunt.task.run(['clean:built', 'bgShell:client', 'express:dev', 'watch']);
             }
         });
 
@@ -753,12 +738,12 @@ var overrides      = require('./core/server/overrides'),
                 grunt.config.set('copy.admin_html', {
                     files: [{
                         cwd: '.',
-                        src: 'core/server/admin/views/default-prod.html',
-                        dest: 'core/server/admin/views/default.html'
+                        src: 'core/server/web/admin/views/default-prod.html',
+                        dest: 'core/server/web/admin/views/default.html'
                     }]
                 });
 
-                grunt.task.run(['update_submodules:pinned', 'subgrunt:init', 'clean:tmp', 'prod', 'clean:release', 'copy:admin_html', 'copy:release', 'compress:release']);
+                grunt.task.run(['update_submodules:pinned', 'subgrunt:init', 'clean:built', 'clean:tmp', 'prod', 'clean:release', 'copy:admin_html', 'copy:release', 'compress:release']);
             }
         );
     };

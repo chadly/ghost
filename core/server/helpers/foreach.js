@@ -6,14 +6,14 @@ var proxy = require('./proxy'),
     _ = require('lodash'),
     logging = proxy.logging,
     i18n = proxy.i18n,
-    visibilityUtils = proxy.visibility,
+    models = proxy.models,
     hbsUtils = proxy.hbs.Utils,
     createFrame = proxy.hbs.handlebars.createFrame;
 
 function filterItemsByVisibility(items, options) {
-    var visibility = visibilityUtils.parser(options);
+    var visibilityArr = models.Base.Model.parseVisibilityString(options.hash.visibility);
 
-    return visibilityUtils.filter(items, visibility, !!options.hash.visibility);
+    return models.Base.Model.filterByVisibility(items, visibilityArr, !!options.hash.visibility);
 }
 
 module.exports = function foreach(items, options) {
@@ -71,15 +71,14 @@ module.exports = function foreach(items, options) {
         }
 
         output = output + fn(items[field], {
-                data: data,
-                blockParams: hbsUtils.blockParams([items[field], field], [contextPath + field, null])
-            });
+            data: data,
+            blockParams: hbsUtils.blockParams([items[field], field], [contextPath + field, null])
+        });
     }
 
     function iterateCollection(context) {
         // Context is all posts on the blog
-        var count = 1,
-            current = 1;
+        var current = 1;
 
         // For each post, if it is a post number that fits within the from and to
         // send the key to execIteration to set to be added to the page
@@ -92,7 +91,6 @@ module.exports = function foreach(items, options) {
             if (current <= to) {
                 execIteration(key, current - 1, current === to);
             }
-            count += 1;
             current += 1;
         });
     }

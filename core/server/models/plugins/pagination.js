@@ -1,7 +1,8 @@
 // # Pagination
 //
 // Extends Bookshelf.Model with a `fetchPage` method. Handles everything to do with paginated requests.
-var _          = require('lodash'),
+var _ = require('lodash'),
+    common = require('../../lib/common'),
     defaults,
     paginationUtils,
     pagination;
@@ -66,12 +67,12 @@ paginationUtils = {
     formatResponse: function formatResponse(totalItems, options) {
         var calcPages = Math.ceil(totalItems / options.limit) || 0,
             pagination = {
-                page:  options.page || defaults.page,
+                page: options.page || defaults.page,
                 limit: options.limit,
                 pages: calcPages === 0 ? 1 : calcPages,
                 total: totalItems,
-                next:  null,
-                prev:  null
+                next: null,
+                prev: null
             };
 
         if (pagination.pages > 1) {
@@ -126,7 +127,7 @@ pagination = function pagination(bookshelf) {
     // Extend updates the first object passed to it, no need for an assignment
     _.extend(bookshelf.Model.prototype, {
         /**
-         * ### Fetch page
+         * ### Fetch page
          * A `fetch` extension to get a paginated set of items from a collection
          *
          * We trigger two queries:
@@ -147,11 +148,6 @@ pagination = function pagination(bookshelf) {
                 countPromise = this.query().clone().select(
                     bookshelf.knex.raw('count(distinct ' + tableName + '.' + idAttribute + ') as aggregate')
                 );
-
-            // the debug flag doesn't work for the raw knex count query!
-            if (this.debug) {
-                console.log('COUNT', countPromise.toQuery());
-            }
 
             // #### Pre count clauses
             // Add any where or join clauses which need to be included with the aggregate query
@@ -194,6 +190,14 @@ pagination = function pagination(bookshelf) {
                             collection: fetchResult,
                             pagination: paginationUtils.formatResponse(countResult[0] ? countResult[0].aggregate : 0, options)
                         };
+                    })
+                    .catch(function (err) {
+                        // e.g. offset/limit reached max allowed integer value
+                        if (err.errno === 20 || err.errno === 1064) {
+                            throw new common.errors.NotFoundError({message: common.i18n.t('errors.errors.pageNotFound')});
+                        }
+
+                        throw err;
                     });
             });
         }

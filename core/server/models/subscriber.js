@@ -1,16 +1,16 @@
-var ghostBookshelf = require('./base'),
-    errors = require('../errors'),
-    events = require('../events'),
-    i18n = require('../i18n'),
-    Promise = require('bluebird'),
+var Promise = require('bluebird'),
+    ghostBookshelf = require('./base'),
+    common = require('../lib/common'),
     Subscriber,
     Subscribers;
 
 Subscriber = ghostBookshelf.Model.extend({
     tableName: 'subscribers',
 
-    emitChange: function emitChange(event) {
-        events.emit('subscriber' + '.' + event, this);
+    emitChange: function emitChange(event, options) {
+        options = options || {};
+
+        common.events.emit('subscriber' + '.' + event, this, options);
     },
 
     defaults: function defaults() {
@@ -19,16 +19,16 @@ Subscriber = ghostBookshelf.Model.extend({
         };
     },
 
-    onCreated: function onCreated(model) {
-        model.emitChange('added');
+    onCreated: function onCreated(model, response, options) {
+        model.emitChange('added', options);
     },
 
-    onUpdated: function onUpdated(model) {
-        model.emitChange('edited');
+    onUpdated: function onUpdated(model, response, options) {
+        model.emitChange('edited', options);
     },
 
-    onDestroyed: function onDestroyed(model) {
-        model.emitChange('deleted');
+    onDestroyed: function onDestroyed(model, response, options) {
+        model.emitChange('deleted', options);
     }
 }, {
 
@@ -71,15 +71,15 @@ Subscriber = ghostBookshelf.Model.extend({
             return Promise.resolve();
         }
 
-        return Promise.reject(new errors.NoPermissionError({message: i18n.t('errors.models.subscriber.notEnoughPermission')}));
+        return Promise.reject(new common.errors.NoPermissionError({message: common.i18n.t('errors.models.subscriber.notEnoughPermission')}));
     },
 
     // TODO: This is a copy paste of models/user.js!
-    getByEmail: function getByEmail(email, options) {
-        options = options || {};
+    getByEmail: function getByEmail(email, unfilteredOptions) {
+        var options = ghostBookshelf.Model.filterOptions(unfilteredOptions, 'getByEmail');
         options.require = true;
 
-        return Subscribers.forge(options).fetch(options).then(function then(subscribers) {
+        return Subscribers.forge().fetch(options).then(function then(subscribers) {
             var subscriberWithEmail = subscribers.find(function findSubscriber(subscriber) {
                 return subscriber.get('email').toLowerCase() === email.toLowerCase();
             });

@@ -14,22 +14,24 @@ require('./overrides');
 
 // Module dependencies
 var debug = require('ghost-ignition').debug('boot:init'),
-// Config should be first require, as it triggers the initial load of the config files
     config = require('./config'),
     Promise = require('bluebird'),
-    i18n = require('./i18n'),
+    common = require('./lib/common'),
     models = require('./models'),
-    permissions = require('./permissions'),
-    apps = require('./apps'),
-    auth = require('./auth'),
+    permissions = require('./services/permissions'),
+    auth = require('./services/auth'),
     dbHealth = require('./data/db/health'),
-    xmlrpc = require('./services/xmlrpc'),
-    slack = require('./services/slack'),
     GhostServer = require('./ghost-server'),
     scheduling = require('./adapters/scheduling'),
-    settings = require('./settings'),
-    themes = require('./themes'),
-    utils = require('./utils');
+    settings = require('./services/settings'),
+    themes = require('./services/themes'),
+    urlService = require('./services/url'),
+
+    // Services that need initialisation
+    apps = require('./services/apps'),
+    xmlrpc = require('./services/xmlrpc'),
+    slack = require('./services/slack'),
+    webhooks = require('./services/webhooks');
 
 // ## Initialise Ghost
 function init() {
@@ -37,9 +39,10 @@ function init() {
 
     var ghostServer, parentApp;
 
-    // Initialize Internationalization
-    i18n.init();
-    debug('I18n done');
+    // Initialize default internationalization, just for core now
+    // (settings for language and theme not yet available here)
+    common.i18n.init();
+    debug('Default i18n done for core');
     models.init();
     debug('models done');
 
@@ -50,6 +53,12 @@ function init() {
         return settings.init();
     }).then(function () {
         debug('Update settings cache done');
+        // Full internationalization for core could be here
+        // in a future version with backend translations
+        // (settings for language and theme available here;
+        // internationalization for theme is done
+        // shortly after, when activating the theme)
+        //
         // Initialize the permissions actions and objects
         return permissions.init();
     }).then(function () {
@@ -61,13 +70,15 @@ function init() {
             // Initialize xmrpc ping
             xmlrpc.listen(),
             // Initialize slack ping
-            slack.listen()
+            slack.listen(),
+            // Initialize webhook pings
+            webhooks.listen()
         );
     }).then(function () {
         debug('Apps, XMLRPC, Slack done');
 
         // Setup our collection of express apps
-        parentApp = require('./app')();
+        parentApp = require('./web/parent-app')();
 
         // Initialise analytics events
         if (config.get('segment:key')) {
@@ -89,7 +100,7 @@ function init() {
         return scheduling.init({
             schedulerUrl: config.get('scheduling').schedulerUrl,
             active: config.get('scheduling').active,
-            apiUrl: utils.url.urlFor('api', true),
+            apiUrl: urlService.utils.urlFor('api', true),
             internalPath: config.get('paths').internalSchedulingPath,
             contentPath: config.getContentPath('scheduling')
         });

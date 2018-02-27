@@ -2,9 +2,10 @@
 // Standalone file which can be required to help with advanced operations on the fixtures.json file
 var _ = require('lodash'),
     Promise = require('bluebird'),
+    common = require('../../../lib/common'),
     models = require('../../../models'),
     baseUtils = require('../../../models/base/utils'),
-    sequence = require('../../../utils/sequence'),
+    sequence = require('../../../lib/promise/sequence'),
     moment = require('moment'),
 
     fixtures = require('./fixtures'),
@@ -18,6 +19,8 @@ var _ = require('lodash'),
 
     addFixturesForModel,
     addFixturesForRelation,
+    removeFixturesForModel,
+
     findModelFixtureEntry,
     findModelFixtures,
     findPermissionRelationsForObject;
@@ -138,6 +141,14 @@ addFixturesForRelation = function addFixturesForRelation(relationFixture, option
         _.each(relationFixture.entries, function processEntries(entry, key) {
             var fromItem = data.from.find(matchFunc(relationFixture.from.match, key));
 
+            // CASE: You add new fixtures e.g. a new role in a new release.
+            // As soon as an **older** migration script wants to add permissions for any resource, it iterates over the
+            // permissions for each role. But if the role does not exist yet, it won't find the matching db entry and breaks.
+            if (!fromItem) {
+                common.logging.warn('Skip: Target database entry not found for key: ' + key);
+                return Promise.resolve();
+            }
+
             _.each(entry, function processEntryValues(value, key) {
                 var toItems = data.to.filter(matchFunc(relationFixture.to.match, key, value));
                 max += toItems.length;
@@ -245,10 +256,24 @@ findPermissionRelationsForObject = function findPermissionRelationsForObject(obj
     return foundRelation;
 };
 
+removeFixturesForModel = function removeFixturesForModel(modelFixture, options) {
+    return Promise.mapSeries(modelFixture.entries, function (entry) {
+        return models[modelFixture.name].findOne(entry.id ? {id: entry.id} : entry, options).then(function (found) {
+            if (found) {
+                return models[modelFixture.name].destroy(_.extend(options, {id: found.id}));
+            }
+        });
+    }).then(function (results) {
+        return {expected: modelFixture.entries.length, done: results.length};
+    });
+};
+
 module.exports = {
     addFixturesForModel: addFixturesForModel,
     addFixturesForRelation: addFixturesForRelation,
     findModelFixtureEntry: findModelFixtureEntry,
     findModelFixtures: findModelFixtures,
-    findPermissionRelationsForObject: findPermissionRelationsForObject
+    findRelationFixture: findRelationFixture,
+    findPermissionRelationsForObject: findPermissionRelationsForObject,
+    removeFixturesForModel: removeFixturesForModel
 };

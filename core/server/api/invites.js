@@ -1,13 +1,12 @@
 var Promise = require('bluebird'),
     _ = require('lodash'),
-    pipeline = require('../utils/pipeline'),
-    mail = require('./../mail'),
-    globalUtils = require('../utils'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    mail = require('../services/mail'),
+    urlService = require('../services/url'),
+    localUtils = require('./utils'),
     models = require('../models'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
-    logging = require('../logging'),
+    common = require('../lib/common'),
+    security = require('../lib/security'),
     mailAPI = require('./mail'),
     settingsAPI = require('./settings'),
     docName = 'invites',
@@ -23,9 +22,9 @@ invites = {
         }
 
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.browseDefaultOptions}),
-            apiUtils.handlePublicPermissions(docName, 'browse'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: localUtils.browseDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'browse'),
             modelQuery
         ];
 
@@ -40,8 +39,8 @@ invites = {
             return models.Invite.findOne(options.data, _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.invites.inviteNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.invites.inviteNotFound')
                         }));
                     }
 
@@ -52,9 +51,9 @@ invites = {
         }
 
         tasks = [
-            apiUtils.validate(docName, {attrs: attrs}),
-            apiUtils.handlePublicPermissions(docName, 'read'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {attrs: attrs}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'read'),
             modelQuery
         ];
 
@@ -68,7 +67,7 @@ invites = {
             return models.Invite.findOne({id: options.id}, _.omit(options, ['data']))
                 .then(function (invite) {
                     if (!invite) {
-                        throw new errors.NotFoundError({message: i18n.t('errors.api.invites.inviteNotFound')});
+                        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.inviteNotFound')});
                     }
 
                     return invite.destroy(options).return(null);
@@ -76,9 +75,9 @@ invites = {
         }
 
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'destroy'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: localUtils.idDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePermissions(docName, 'destroy'),
             modelQuery
         ];
 
@@ -101,14 +100,14 @@ invites = {
                     return settingsAPI.read({key: 'title'});
                 })
                 .then(function (response) {
-                    var adminUrl = globalUtils.url.urlFor('admin', true);
+                    var adminUrl = urlService.utils.urlFor('admin', true);
 
                     emailData = {
                         blogName: response.settings[0].value,
                         invitedByName: loggedInUser.get('name'),
                         invitedByEmail: loggedInUser.get('email'),
                         // @TODO: resetLink sounds weird
-                        resetLink: globalUtils.url.urlJoin(adminUrl, 'signup', globalUtils.encodeBase64URLsafe(invite.get('token')), '/')
+                        resetLink: urlService.utils.urlJoin(adminUrl, 'signup', security.url.encodeBase64(invite.get('token')), '/')
                     };
 
                     return mail.utils.generateContent({data: emailData, template: 'invite-user'});
@@ -117,7 +116,7 @@ invites = {
                         mail: [{
                             message: {
                                 to: invite.get('email'),
-                                subject: i18n.t('common.api.users.mail.invitedByName', {
+                                subject: common.i18n.t('common.api.users.mail.invitedByName', {
                                     invitedByName: emailData.invitedByName,
                                     blogName: emailData.blogName
                                 }),
@@ -141,9 +140,9 @@ invites = {
                     };
                 }).catch(function (error) {
                     if (error && error.errorType === 'EmailError') {
-                        error.message = i18n.t('errors.api.invites.errorSendingEmail.error', {message: error.message}) + ' ' +
-                            i18n.t('errors.api.invites.errorSendingEmail.help');
-                        logging.warn(error.message);
+                        error.message = common.i18n.t('errors.api.invites.errorSendingEmail.error', {message: error.message}) + ' ' +
+                            common.i18n.t('errors.api.invites.errorSendingEmail.help');
+                        common.logging.warn(error.message);
                     }
 
                     return Promise.reject(error);
@@ -168,11 +167,11 @@ invites = {
 
         function validation(options) {
             if (!options.data.invites[0].email) {
-                return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.invites.emailIsRequired')}));
+                return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.invites.emailIsRequired')}));
             }
 
             if (!options.data.invites[0].role_id) {
-                return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.invites.roleIsRequired')}));
+                return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.invites.roleIsRequired')}));
             }
 
             // @TODO remove when we have a new permission unit
@@ -182,25 +181,25 @@ invites = {
             // As we are looking forward to replace the permission system completely, we do not add a hack here
             return models.Role.findOne({id: options.data.invites[0].role_id}).then(function (roleToInvite) {
                 if (!roleToInvite) {
-                    return Promise.reject(new errors.NotFoundError({message: i18n.t('errors.api.invites.roleNotFound')}));
+                    return Promise.reject(new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.roleNotFound')}));
                 }
 
                 if (roleToInvite.get('name') === 'Owner') {
-                    return Promise.reject(new errors.NoPermissionError({message: i18n.t('errors.api.invites.notAllowedToInviteOwner')}));
+                    return Promise.reject(new common.errors.NoPermissionError({message: common.i18n.t('errors.api.invites.notAllowedToInviteOwner')}));
                 }
 
                 var loggedInUserRole = loggedInUser.related('roles').models[0].get('name'),
                     allowed = [];
 
                 if (loggedInUserRole === 'Owner' || loggedInUserRole === 'Administrator') {
-                    allowed = ['Administrator', 'Editor', 'Author'];
+                    allowed = ['Administrator', 'Editor', 'Author', 'Contributor'];
                 } else if (loggedInUserRole === 'Editor') {
-                    allowed = ['Author'];
+                    allowed = ['Author', 'Contributor'];
                 }
 
                 if (allowed.indexOf(roleToInvite.get('name')) === -1) {
-                    return Promise.reject(new errors.NoPermissionError({
-                        message: i18n.t('errors.api.invites.notAllowedToInvite')
+                    return Promise.reject(new common.errors.NoPermissionError({
+                        message: common.i18n.t('errors.api.invites.notAllowedToInvite')
                     }));
                 }
             }).then(function () {
@@ -212,8 +211,8 @@ invites = {
             return models.User.findOne({email: options.data.invites[0].email}, options)
                 .then(function (user) {
                     if (user) {
-                        return Promise.reject(new errors.ValidationError({
-                            message: i18n.t('errors.api.users.userAlreadyRegistered')
+                        return Promise.reject(new common.errors.ValidationError({
+                            message: common.i18n.t('errors.api.users.userAlreadyRegistered')
                         }));
                     }
 
@@ -222,10 +221,10 @@ invites = {
         }
 
         function fetchLoggedInUser(options) {
-            return models.User.findOne({id: loggedInUser}, _.merge({}, options, {include: ['roles']}))
+            return models.User.findOne({id: loggedInUser}, _.merge({}, _.omit(options, 'data'), {withRelated: ['roles']}))
                 .then(function (user) {
                     if (!user) {
-                        return Promise.reject(new errors.NotFoundError({message: i18n.t('errors.api.users.userNotFound')}));
+                        return Promise.reject(new common.errors.NotFoundError({message: common.i18n.t('errors.api.users.userNotFound')}));
                     }
 
                     loggedInUser = user;
@@ -234,9 +233,9 @@ invites = {
         }
 
         tasks = [
-            apiUtils.validate(docName, {opts: ['email']}),
-            apiUtils.handlePermissions(docName, 'add'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: ['email']}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePermissions(docName, 'add'),
             fetchLoggedInUser,
             validation,
             checkIfUserExists,

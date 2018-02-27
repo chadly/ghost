@@ -1,17 +1,17 @@
-var schema    = require('../schema').tables,
-    _         = require('lodash'),
+var schema = require('../schema').tables,
+    _ = require('lodash'),
     validator = require('validator'),
-    moment    = require('moment-timezone'),
-    assert    = require('assert'),
-    Promise   = require('bluebird'),
-    errors    = require('../../errors'),
-    i18n      = require('../../i18n'),
-    settingsCache = require('../../settings/cache'),
-    utils = require('../../utils/url'),
+    moment = require('moment-timezone'),
+    assert = require('assert'),
+    Promise = require('bluebird'),
+    common = require('../../lib/common'),
+    settingsCache = require('../../services/settings/cache'),
+    urlService = require('../../services/url'),
 
     validatePassword,
     validateSchema,
     validateSettings,
+    validateRedirects,
     validate;
 
 function assertString(input) {
@@ -19,11 +19,11 @@ function assertString(input) {
 }
 
 /**
-* Counts repeated characters in a string. When 50% or more characters are the same,
-* we return false and therefore invalidate the string.
-* @param {String} stringToTest The password string to check.
-* @return {Boolean}
-*/
+ * Counts repeated characters in a string. When 50% or more characters are the same,
+ * we return false and therefore invalidate the string.
+ * @param {String} stringToTest The password string to check.
+ * @return {Boolean}
+ */
 function characterOccurance(stringToTest) {
     var chars = {},
         allowedOccurancy,
@@ -46,7 +46,6 @@ function characterOccurance(stringToTest) {
     _.forIn(chars, function (charCount) {
         if (charCount >= allowedOccurancy) {
             valid = false;
-            return;
         }
     });
 
@@ -54,6 +53,7 @@ function characterOccurance(stringToTest) {
 }
 
 // extends has been removed in validator >= 5.0.0, need to monkey-patch it back in
+// @TODO: We modify the global validator dependency here! https://github.com/chriso/validator.js/issues/525#issuecomment-213149570
 validator.extend = function (name, fn) {
     validator[name] = function () {
         var args = Array.prototype.slice.call(arguments);
@@ -84,29 +84,29 @@ validator.extend('isSlug', function isSlug(str) {
 });
 
 /**
-* Validation against simple password rules
-* Returns false when validation fails and true for a valid password
-* @param {String} password The password string to check.
-* @param {String} email The users email address to validate agains password.
-* @param {String} blogTitle Optional blogTitle value, when blog title is not set yet, e. g. in setup process.
-* @return {Object} example for returned validation Object:
-* invalid password: `validationResult: {isValid: false, message: 'Sorry, you cannot use an insecure password.'}`
-* valid password: `validationResult: {isValid: true}`
-*/
+ * Validation against simple password rules
+ * Returns false when validation fails and true for a valid password
+ * @param {String} password The password string to check.
+ * @param {String} email The users email address to validate agains password.
+ * @param {String} blogTitle Optional blogTitle value, when blog title is not set yet, e. g. in setup process.
+ * @return {Object} example for returned validation Object:
+ * invalid password: `validationResult: {isValid: false, message: 'Sorry, you cannot use an insecure password.'}`
+ * valid password: `validationResult: {isValid: true}`
+ */
 validatePassword = function validatePassword(password, email, blogTitle) {
     var validationResult = {isValid: true},
         disallowedPasswords = ['password', 'ghost', 'passw0rd'],
-        blogUrl = utils.urlFor('home', true),
+        blogUrl = urlService.utils.urlFor('home', true),
         badPasswords = [
-        '1234567890',
-        'qwertyuiop',
-        'qwertzuiop',
-        'asdfghjkl;',
-        'abcdefghij',
-        '0987654321',
-        '1q2w3e4r5t',
-        '12345asdfg'
-    ];
+            '1234567890',
+            'qwertyuiop',
+            'qwertzuiop',
+            'asdfghjkl;',
+            'abcdefghij',
+            '0987654321',
+            '1q2w3e4r5t',
+            '12345asdfg'
+        ];
 
     blogTitle = blogTitle ? blogTitle : settingsCache.get('title');
     blogUrl = blogUrl.replace(/^http(s?):\/\//, '');
@@ -114,7 +114,7 @@ validatePassword = function validatePassword(password, email, blogTitle) {
     // password must be longer than 10 characters
     if (!validator.isLength(password, 10)) {
         validationResult.isValid = false;
-        validationResult.message = i18n.t('errors.models.user.passwordDoesNotComplyLength', {minLength: 10});
+        validationResult.message = common.i18n.t('errors.models.user.passwordDoesNotComplyLength', {minLength: 10});
 
         return validationResult;
     }
@@ -155,61 +155,107 @@ validatePassword = function validatePassword(password, email, blogTitle) {
 
     // Generic error message for the rules where no dedicated error massage is set
     if (!validationResult.isValid && !validationResult.message) {
-        validationResult.message = i18n.t('errors.models.user.passwordDoesNotComplySecurity');
+        validationResult.message = common.i18n.t('errors.models.user.passwordDoesNotComplySecurity');
     }
 
     return validationResult;
 };
 
-// Validation against schema attributes
-// values are checked against the validation objects from schema.js
-validateSchema = function validateSchema(tableName, model) {
+/**
+ * Validate model against schema.
+ *
+ * ## on model update
+ * - only validate changed fields
+ * - otherwise we could throw errors which the user is out of control
+ * - e.g.
+ *   - we add a new field without proper validation, release goes out
+ *   - we add proper validation for a single field
+ * - if you call `user.save()` the default fallback in bookshelf is `options.method=update`.
+ * - we set `options.method` explicit for adding resources (because otherwise bookshelf uses `update`)
+ *
+ * ## on model add
+ * - validate everything to catch required fields
+ */
+validateSchema = function validateSchema(tableName, model, options) {
+    options = options || {};
+
     var columns = _.keys(schema[tableName]),
         validationErrors = [];
 
     _.each(columns, function each(columnKey) {
         var message = '',
-            strVal = _.toString(model[columnKey]);
+            strVal = _.toString(model.get(columnKey)); // KEEP: Validator.js only validates strings.
+
+        if (options.method !== 'insert' && !_.has(model.changed, columnKey)) {
+            return;
+        }
 
         // check nullable
-        if (model.hasOwnProperty(columnKey) && schema[tableName][columnKey].hasOwnProperty('nullable')
-                && schema[tableName][columnKey].nullable !== true) {
+        if (schema[tableName][columnKey].hasOwnProperty('nullable') &&
+            schema[tableName][columnKey].nullable !== true &&
+            !schema[tableName][columnKey].hasOwnProperty('defaultTo')
+        ) {
             if (validator.empty(strVal)) {
-                message = i18n.t('notices.data.validation.index.valueCannotBeBlank', {tableName: tableName, columnKey: columnKey});
-                validationErrors.push(new errors.ValidationError({message: message, context: tableName + '.' + columnKey}));
+                message = common.i18n.t('notices.data.validation.index.valueCannotBeBlank', {
+                    tableName: tableName,
+                    columnKey: columnKey
+                });
+                validationErrors.push(new common.errors.ValidationError({
+                    message: message,
+                    context: tableName + '.' + columnKey
+                }));
             }
         }
 
         // validate boolean columns
-        if (model.hasOwnProperty(columnKey) && schema[tableName][columnKey].hasOwnProperty('type')
-                && schema[tableName][columnKey].type === 'bool') {
+        if (schema[tableName][columnKey].hasOwnProperty('type')
+            && schema[tableName][columnKey].type === 'bool') {
             if (!(validator.isBoolean(strVal) || validator.empty(strVal))) {
-                message = i18n.t('notices.data.validation.index.valueMustBeBoolean', {tableName: tableName, columnKey: columnKey});
-                validationErrors.push(new errors.ValidationError({message: message, context: tableName + '.' + columnKey}));
+                message = common.i18n.t('notices.data.validation.index.valueMustBeBoolean', {
+                    tableName: tableName,
+                    columnKey: columnKey
+                });
+                validationErrors.push(new common.errors.ValidationError({
+                    message: message,
+                    context: tableName + '.' + columnKey
+                }));
             }
         }
 
         // TODO: check if mandatory values should be enforced
-        if (model[columnKey] !== null && model[columnKey] !== undefined) {
+        if (model.get(columnKey) !== null && model.get(columnKey) !== undefined) {
             // check length
             if (schema[tableName][columnKey].hasOwnProperty('maxlength')) {
                 if (!validator.isLength(strVal, 0, schema[tableName][columnKey].maxlength)) {
-                    message = i18n.t('notices.data.validation.index.valueExceedsMaxLength',
-                                     {tableName: tableName, columnKey: columnKey, maxlength: schema[tableName][columnKey].maxlength});
-                    validationErrors.push(new errors.ValidationError({message: message, context: tableName + '.' + columnKey}));
+                    message = common.i18n.t('notices.data.validation.index.valueExceedsMaxLength',
+                        {
+                            tableName: tableName,
+                            columnKey: columnKey,
+                            maxlength: schema[tableName][columnKey].maxlength
+                        });
+                    validationErrors.push(new common.errors.ValidationError({
+                        message: message,
+                        context: tableName + '.' + columnKey
+                    }));
                 }
             }
 
             // check validations objects
-            if (schema[tableName][columnKey].hasOwnProperty('validations')) {
-                validationErrors = validationErrors.concat(validate(strVal, columnKey, schema[tableName][columnKey].validations));
+            if (schema[tableName][columnKey].hasOwnProperty('validations')) {
+                validationErrors = validationErrors.concat(validate(strVal, columnKey, schema[tableName][columnKey].validations, tableName));
             }
 
             // check type
-            if (schema[tableName][columnKey].hasOwnProperty('type')) {
+            if (schema[tableName][columnKey].hasOwnProperty('type')) {
                 if (schema[tableName][columnKey].type === 'integer' && !validator.isInt(strVal)) {
-                    message = i18n.t('notices.data.validation.index.valueIsNotInteger', {tableName: tableName, columnKey: columnKey});
-                    validationErrors.push(new errors.ValidationError({message: message, context: tableName + '.' + columnKey}));
+                    message = common.i18n.t('notices.data.validation.index.valueIsNotInteger', {
+                        tableName: tableName,
+                        columnKey: columnKey
+                    });
+                    validationErrors.push(new common.errors.ValidationError({
+                        message: message,
+                        context: tableName + '.' + columnKey
+                    }));
                 }
             }
         }
@@ -231,7 +277,7 @@ validateSettings = function validateSettings(defaultSettings, model) {
         matchingDefault = defaultSettings[values.key];
 
     if (matchingDefault && matchingDefault.validations) {
-        validationErrors = validationErrors.concat(validate(values.value, values.key, matchingDefault.validations));
+        validationErrors = validationErrors.concat(validate(values.value, values.key, matchingDefault.validations, 'settings'));
     }
 
     if (validationErrors.length !== 0) {
@@ -241,25 +287,29 @@ validateSettings = function validateSettings(defaultSettings, model) {
     return Promise.resolve();
 };
 
-// Validate default settings using the validator module.
-// Each validation's key is a method name and its value is an array of options
-//
-// eg:
-//      validations: { isURL: true, isLength: [20, 40] }
-//
-// will validate that a setting's length is a URL between 20 and 40 chars.
-//
-// If you pass a boolean as the value, it will specify the "good" result. By default
-// the "good" result is assumed to be true.
-//
-// eg:
-//      validations: { isNull: false }  // means the "good" result would
-//                                      // fail the `isNull` check, so
-//                                      // not null.
-//
-// available validators: https://github.com/chriso/validator.js#validators
-validate = function validate(value, key, validations) {
-    var validationErrors = [];
+/**
+ * Validate keys using the validator module.
+ * Each validation's key is a method name and its value is an array of options
+ * eg:
+ *       validations: { isURL: true, isLength: [20, 40] }
+ * will validate that a values's length is a URL between 20 and 40 chars.
+ *
+ * If you pass a boolean as the value, it will specify the "good" result. By default
+ * the "good" result is assumed to be true.
+ * eg:
+ *       validations: { isNull: false } // means the "good" result would
+ *                                      // fail the `isNull` check, so
+ *                                      // not null.
+ *
+ * available validators: https://github.com/chriso/validator.js#validators
+ * @param {String} value the value to validate.
+ * @param {String} key the db column key of the value to validate.
+ * @param {Object} validations the validations object as described above.
+ * @param {String} tableName (optional) the db table of the value to validate, used for error message.
+ * @return {Array} returns an Array including the found validation errors (empty if none found);
+ */
+validate = function validate(value, key, validations, tableName) {
+    var validationErrors = [], translation;
     value = _.toString(value);
 
     _.each(validations, function each(validationOptions, validationName) {
@@ -276,8 +326,22 @@ validate = function validate(value, key, validations) {
 
         // equivalent of validator.isSomething(option1, option2)
         if (validator[validationName].apply(validator, validationOptions) !== goodResult) {
-            validationErrors.push(new errors.ValidationError({
-                message: i18n.t('notices.data.validation.index.validationFailed', {validationName: validationName, key: key})
+            // CASE: You can define specific translations for validators e.g. isLength
+            if (common.i18n.doesTranslationKeyExist('notices.data.validation.index.validationFailedTypes.' + validationName)) {
+                translation = common.i18n.t('notices.data.validation.index.validationFailedTypes.' + validationName, _.merge({
+                    validationName: validationName,
+                    key: key,
+                    tableName: tableName
+                }, validationOptions[1]));
+            } else {
+                translation = common.i18n.t('notices.data.validation.index.validationFailed', {
+                    validationName: validationName,
+                    key: key
+                });
+            }
+
+            validationErrors.push(new common.errors.ValidationError({
+                message: translation
             }));
         }
 
@@ -287,10 +351,34 @@ validate = function validate(value, key, validations) {
     return validationErrors;
 };
 
+/**
+ * Redirects are file based at the moment, but they will live in the database in the future.
+ * See V2 of https://github.com/TryGhost/Ghost/issues/7707.
+ */
+validateRedirects = function validateRedirects(redirects) {
+    if (!_.isArray(redirects)) {
+        throw new common.errors.ValidationError({
+            message: common.i18n.t('errors.utils.redirectsWrongFormat'),
+            help: 'https://docs.ghost.org/docs/redirects'
+        });
+    }
+
+    _.each(redirects, function (redirect) {
+        if (!redirect.from || !redirect.to) {
+            throw new common.errors.ValidationError({
+                message: common.i18n.t('errors.utils.redirectsWrongFormat'),
+                context: JSON.stringify(redirect),
+                help: 'https://docs.ghost.org/docs/redirects'
+            });
+        }
+    });
+};
+
 module.exports = {
     validate: validate,
     validator: validator,
     validatePassword: validatePassword,
     validateSchema: validateSchema,
-    validateSettings: validateSettings
+    validateSettings: validateSettings,
+    validateRedirects: validateRedirects
 };

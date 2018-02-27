@@ -1,7 +1,7 @@
 var _ = require('lodash'),
     Promise = require('bluebird'),
+    sequence = require('../../../../lib/promise/sequence'),
     models = require('../../../../models'),
-    utils = require('../../../../utils'),
     SubscribersImporter = require('./subscribers'),
     PostsImporter = require('./posts'),
     TagsImporter = require('./tags'),
@@ -20,9 +20,9 @@ DataImporter = {
     },
 
     init: function init(importData) {
+        importers.users = new UsersImporter(importData.data);
         importers.roles = new RolesImporter(importData.data);
         importers.tags = new TagsImporter(importData.data);
-        importers.users = new UsersImporter(importData.data);
         importers.subscribers = new SubscribersImporter(importData.data);
         importers.posts = new PostsImporter(importData.data);
         importers.settings = new SettingsImporter(importData.data);
@@ -32,6 +32,8 @@ DataImporter = {
 
     // Allow importing with an options object that is passed through the importer
     doImport: function doImport(importData, importOptions) {
+        importOptions = importOptions || {};
+
         var ops = [], errors = [], results = [], modelOptions = {
             importing: true,
             context: {
@@ -39,9 +41,14 @@ DataImporter = {
             }
         };
 
-        if (importOptions && importOptions.importPersistUser) {
+        if (!importOptions.hasOwnProperty('returnImportedData')) {
+            importOptions.returnImportedData = false;
+        }
+
+        if (importOptions.importPersistUser) {
             modelOptions.importPersistUser = importOptions.importPersistUser;
         }
+
         this.init(importData);
 
         return models.Base.transaction(function (transacting) {
@@ -49,9 +56,27 @@ DataImporter = {
 
             _.each(importers, function (importer) {
                 ops.push(function doModelImport() {
-                    return importer.beforeImport(modelOptions, importOptions)
+                    return importer.fetchExisting(modelOptions, importOptions)
                         .then(function () {
-                            return importer.doImport(modelOptions)
+                            return importer.beforeImport(modelOptions, importOptions);
+                        })
+                        .then(function () {
+                            if (importer.options.requiredImportedData.length) {
+                                _.each(importer.options.requiredImportedData, (key) => {
+                                    importer.requiredImportedData[key] = importers[key].importedData;
+                                });
+                            }
+
+                            if (importer.options.requiredExistingData.length) {
+                                _.each(importer.options.requiredExistingData, (key) => {
+                                    importer.requiredExistingData[key] = importers[key].existingData;
+                                });
+                            }
+
+                            return importer.replaceIdentifiers(modelOptions, importOptions);
+                        })
+                        .then(function () {
+                            return importer.doImport(modelOptions, importOptions)
                                 .then(function (_results) {
                                     results = results.concat(_results);
                                 });
@@ -59,13 +84,7 @@ DataImporter = {
                 });
             });
 
-            _.each(importers, function (importer) {
-                ops.push(function afterImport() {
-                    return importer.afterImport(modelOptions);
-                });
-            });
-
-            utils.sequence(ops)
+            sequence(ops)
                 .then(function () {
                     results.forEach(function (promise) {
                         if (!promise.isFulfilled()) {
@@ -93,7 +112,10 @@ DataImporter = {
 
             _.each(importers, function (importer) {
                 toReturn.problems = toReturn.problems.concat(importer.problems);
-                toReturn.data[importer.dataKeyToImport] = importer.importedData;
+
+                if (importOptions.returnImportedData) {
+                    toReturn.data[importer.dataKeyToImport] = importer.importedDataToReturn;
+                }
             });
 
             return toReturn;

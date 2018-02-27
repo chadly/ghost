@@ -2,12 +2,11 @@
 // RESTful API for the User resource
 var Promise = require('bluebird'),
     _ = require('lodash'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
-    canThis = require('../permissions').canThis,
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
+    canThis = require('../services/permissions').canThis,
     models = require('../models'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
+    common = require('../lib/common'),
     docName = 'users',
     // TODO: implement created_by, updated_by
     allowedIncludes = ['count.posts', 'permissions', 'roles', 'roles.permissions'],
@@ -16,7 +15,7 @@ var Promise = require('bluebird'),
 /**
  * ### Users API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 users = {
     /**
@@ -27,7 +26,7 @@ users = {
      */
     browse: function browse(options) {
         var extraOptions = ['status'],
-            permittedOptions = apiUtils.browseDefaultOptions.concat(extraOptions),
+            permittedOptions = localUtils.browseDefaultOptions.concat(extraOptions),
             tasks;
 
         /**
@@ -42,9 +41,9 @@ users = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: permittedOptions}),
-            apiUtils.handlePublicPermissions(docName, 'browse'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: permittedOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'browse'),
             doQuery
         ];
 
@@ -76,8 +75,8 @@ users = {
             return models.User.findOne(options.data, _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.users.userNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.users.userNotFound')
                         }));
                     }
 
@@ -89,9 +88,9 @@ users = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {attrs: attrs}),
-            apiUtils.handlePublicPermissions(docName, 'read'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {attrs: attrs}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'read'),
             doQuery
         ];
 
@@ -107,7 +106,7 @@ users = {
      */
     edit: function edit(object, options) {
         var extraOptions = ['editRoles'],
-            permittedOptions = extraOptions.concat(apiUtils.idDefaultOptions),
+            permittedOptions = extraOptions.concat(localUtils.idDefaultOptions),
             tasks;
 
         if (object.users && object.users[0] && object.users[0].roles && object.users[0].roles[0]) {
@@ -137,8 +136,8 @@ users = {
                 // CASE: can't edit my own status to inactive or locked
                 if (options.id === options.context.user) {
                     if (models.User.inactiveStates.indexOf(options.data.users[0].status) !== -1) {
-                        return Promise.reject(new errors.NoPermissionError({
-                            message: i18n.t('errors.api.users.cannotChangeStatus')
+                        return Promise.reject(new common.errors.NoPermissionError({
+                            message: common.i18n.t('errors.api.users.cannotChangeStatus')
                         }));
                     }
                 }
@@ -154,13 +153,13 @@ users = {
                     editedUserId = options.id;
 
                 return models.User.findOne(
-                    {id: options.context.user, status: 'all'}, {include: ['roles']}
+                    {id: options.context.user, status: 'all'}, {withRelated: ['roles']}
                 ).then(function (contextUser) {
                     var contextRoleId = contextUser.related('roles').toJSON(options)[0].id;
 
                     if (roleId !== contextRoleId && editedUserId === contextUser.id) {
-                        return Promise.reject(new errors.NoPermissionError({
-                            message: i18n.t('errors.api.users.cannotChangeOwnRole')
+                        return Promise.reject(new common.errors.NoPermissionError({
+                            message: common.i18n.t('errors.api.users.cannotChangeOwnRole')
                         }));
                     }
 
@@ -168,8 +167,8 @@ users = {
                         if (contextUser.id !== owner.id) {
                             if (editedUserId === owner.id) {
                                 if (owner.related('roles').at(0).id !== roleId) {
-                                    return Promise.reject(new errors.NoPermissionError({
-                                        message: i18n.t('errors.api.users.cannotChangeOwnersRole')
+                                    return Promise.reject(new common.errors.NoPermissionError({
+                                        message: common.i18n.t('errors.api.users.cannotChangeOwnersRole')
                                     }));
                                 }
                             } else if (roleId !== contextRoleId) {
@@ -183,9 +182,9 @@ users = {
                     });
                 });
             }).catch(function handleError(err) {
-                return Promise.reject(new errors.NoPermissionError({
+                return Promise.reject(new common.errors.NoPermissionError({
                     err: err,
-                    context: i18n.t('errors.api.users.noPermissionToEditUser')
+                    context: common.i18n.t('errors.api.users.noPermissionToEditUser')
                 }));
             });
         }
@@ -200,8 +199,8 @@ users = {
             return models.User.edit(options.data.users[0], _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.users.userNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.users.userNotFound')
                         }));
                     }
 
@@ -213,9 +212,9 @@ users = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: permittedOptions}),
+            localUtils.validate(docName, {opts: permittedOptions}),
+            localUtils.convertOptions(allowedIncludes),
             handlePermissions,
-            apiUtils.convertOptions(allowedIncludes),
             doQuery
         ];
 
@@ -241,9 +240,9 @@ users = {
                 options.status = 'all';
                 return options;
             }).catch(function handleError(err) {
-                return Promise.reject(new errors.NoPermissionError({
+                return Promise.reject(new common.errors.NoPermissionError({
                     err: err,
-                    context: i18n.t('errors.api.users.noPermissionToDestroyUser')
+                    context: common.i18n.t('errors.api.users.noPermissionToDestroyUser')
                 }));
             });
         }
@@ -265,7 +264,7 @@ users = {
                     return models.User.destroy(options);
                 }).return(null);
             }).catch(function (err) {
-                return Promise.reject(new errors.NoPermissionError({
+                return Promise.reject(new common.errors.NoPermissionError({
                     err: err
                 }));
             });
@@ -273,9 +272,9 @@ users = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
+            localUtils.validate(docName, {opts: localUtils.idDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
             handlePermissions,
-            apiUtils.convertOptions(allowedIncludes),
             deleteUser
         ];
 
@@ -293,13 +292,13 @@ users = {
         var tasks;
 
         function validateRequest() {
-            return apiUtils.validate('password')(object, options)
+            return localUtils.validate('password')(object, options)
                 .then(function (options) {
                     var data = options.data.password[0];
 
                     if (data.newPassword !== data.ne2Password) {
-                        return Promise.reject(new errors.ValidationError({
-                            message: i18n.t('errors.models.user.newPasswordsDoNotMatch')
+                        return Promise.reject(new common.errors.ValidationError({
+                            message: common.i18n.t('errors.models.user.newPasswordsDoNotMatch')
                         }));
                     }
 
@@ -317,9 +316,9 @@ users = {
             return canThis(options.context).edit.user(options.data.password[0].user_id).then(function permissionGranted() {
                 return options;
             }).catch(function (err) {
-                return Promise.reject(new errors.NoPermissionError({
+                return Promise.reject(new common.errors.NoPermissionError({
                     err: err,
-                    context: i18n.t('errors.api.users.noPermissionToChangeUsersPwd')
+                    context: common.i18n.t('errors.api.users.noPermissionToChangeUsersPwd')
                 }));
             });
         }
@@ -336,7 +335,7 @@ users = {
                 _.omit(options, ['data'])
             ).then(function onModelResponse() {
                 return Promise.resolve({
-                    password: [{message: i18n.t('notices.api.users.pwdChangedSuccessfully')}]
+                    password: [{message: common.i18n.t('notices.api.users.pwdChangedSuccessfully')}]
                 });
             });
         }
@@ -344,8 +343,8 @@ users = {
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
             validateRequest,
+            localUtils.convertOptions(allowedIncludes),
             handlePermissions,
-            apiUtils.convertOptions(allowedIncludes),
             doQuery
         ];
 
@@ -395,9 +394,9 @@ users = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate('owner'),
+            localUtils.validate('owner'),
+            localUtils.convertOptions(allowedIncludes),
             handlePermissions,
-            apiUtils.convertOptions(allowedIncludes),
             doQuery
         ];
 

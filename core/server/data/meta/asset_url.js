@@ -1,13 +1,17 @@
-var config = require('../../config'),
-    blogIconUtils = require('../../utils/blog-icon'),
-    utils = require('../../utils');
+'use strict';
+
+const crypto = require('crypto'),
+    config = require('../../config'),
+    imageLib = require('../../lib/image'),
+    urlService = require('../../services/url'),
+    packageInfo = require('../../../../package.json');
 
 /**
  * Serve either uploaded favicon or default
  * @return {string}
  */
 function getFaviconUrl() {
-    return blogIconUtils.getIconUrl();
+    return imageLib.blogIcon.getIconUrl();
 }
 
 function getAssetUrl(path, hasMinFile) {
@@ -19,11 +23,11 @@ function getAssetUrl(path, hasMinFile) {
 
     // CASE: Build the output URL
     // Add subdirectory...
-    var output = utils.url.urlJoin(utils.url.getSubdir(), '/');
+    var output = urlService.utils.urlJoin(urlService.utils.getSubdir(), '/');
 
     // Optionally add /assets/
     if (!path.match(/^public/) && !path.match(/^asset/)) {
-        output = utils.url.urlJoin(output, 'assets/');
+        output = urlService.utils.urlJoin(output, 'assets/');
     }
 
     // replace ".foo" with ".min.foo" if configured
@@ -32,12 +36,12 @@ function getAssetUrl(path, hasMinFile) {
     }
 
     // Add the path for the requested asset
-    output = utils.url.urlJoin(output, path);
+    output = urlService.utils.urlJoin(output, path);
 
     // Ensure we have an assetHash
     // @TODO rework this!
     if (!config.get('assetHash')) {
-        config.set('assetHash', utils.generateAssetHash());
+        config.set('assetHash', (crypto.createHash('md5').update(packageInfo.version + Date.now()).digest('hex')).substring(0, 10));
     }
 
     // Finally add the asset hash to the output URL

@@ -1,13 +1,11 @@
 var Settings,
-    Promise        = require('bluebird'),
-    _              = require('lodash'),
-    uuid           = require('uuid'),
-    crypto         = require('crypto'),
+    Promise = require('bluebird'),
+    _ = require('lodash'),
+    uuid = require('uuid'),
+    crypto = require('crypto'),
     ghostBookshelf = require('./base'),
-    errors         = require('../errors'),
-    events         = require('../events'),
-    i18n           = require('../i18n'),
-    validation     = require('../data/validation'),
+    common = require('../lib/common'),
+    validation = require('../data/validation'),
 
     internalContext = {context: {internal: true}},
 
@@ -60,7 +58,7 @@ Settings = ghostBookshelf.Model.extend({
     },
 
     emitChange: function emitChange(event, options) {
-        events.emit('settings' + '.' + event, this, options);
+        common.events.emit('settings' + '.' + event, this, options);
     },
 
     onDestroyed: function onDestroyed(model, response, options) {
@@ -79,12 +77,12 @@ Settings = ghostBookshelf.Model.extend({
     },
 
     onValidate: function onValidate() {
-        var self = this,
-            setting = this.toJSON();
+        var self = this;
 
-        return validation.validateSchema(self.tableName, setting).then(function then() {
-            return validation.validateSettings(getDefaultSettings(), self);
-        });
+        return ghostBookshelf.Model.prototype.onValidate.apply(this, arguments)
+            .then(function then() {
+                return validation.validateSettings(getDefaultSettings(), self);
+            });
     }
 }, {
     findOne: function (data, options) {
@@ -100,9 +98,9 @@ Settings = ghostBookshelf.Model.extend({
         return Promise.resolve(ghostBookshelf.Model.findOne.call(this, data, options));
     },
 
-    edit: function (data, options) {
-        var self = this;
-        options = this.filterOptions(options, 'edit');
+    edit: function (data, unfilteredOptions) {
+        var options = this.filterOptions(unfilteredOptions, 'edit'),
+            self = this;
 
         if (!Array.isArray(data)) {
             data = [data];
@@ -110,46 +108,58 @@ Settings = ghostBookshelf.Model.extend({
 
         return Promise.map(data, function (item) {
             // Accept an array of models as input
-            if (item.toJSON) { item = item.toJSON(); }
+            if (item.toJSON) {
+                item = item.toJSON();
+            }
             if (!(_.isString(item.key) && item.key.length > 0)) {
-                return Promise.reject(new errors.ValidationError({message: i18n.t('errors.models.settings.valueCannotBeBlank')}));
+                return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.models.settings.valueCannotBeBlank')}));
             }
 
             item = self.filterData(item);
 
             return Settings.forge({key: item.key}).fetch(options).then(function then(setting) {
-                var saveData = {};
-
                 if (setting) {
-                    if (item.hasOwnProperty('value')) {
-                        saveData.value = item.value;
-                    }
-                    // Internal context can overwrite type (for fixture migrations)
-                    if (options.context && options.context.internal && item.hasOwnProperty('type')) {
-                        saveData.type = item.type;
-                    }
                     // it's allowed to edit all attributes in case of importing/migrating
                     if (options.importing) {
-                        saveData = item;
-                    }
+                        return setting.save(item, options);
+                    } else {
+                        // If we have a value, set it.
+                        if (item.hasOwnProperty('value')) {
+                            setting.set('value', item.value);
+                        }
+                        // Internal context can overwrite type (for fixture migrations)
+                        if (options.context && options.context.internal && item.hasOwnProperty('type')) {
+                            setting.set('type', item.type);
+                        }
 
-                    return setting.save(saveData, options);
+                        // If anything has changed, save the updated model
+                        if (setting.hasChanged()) {
+                            return setting.save(null, options);
+                        }
+
+                        return setting;
+                    }
                 }
 
-                return Promise.reject(new errors.NotFoundError({message: i18n.t('errors.models.settings.unableToFindSetting', {key: item.key})}));
+                return Promise.reject(new common.errors.NotFoundError({message: common.i18n.t('errors.models.settings.unableToFindSetting', {key: item.key})}));
             });
         });
     },
 
-    populateDefaults: function populateDefaults(options) {
-        var self = this;
+    populateDefaults: function populateDefaults(unfilteredOptions) {
+        var options = this.filterOptions(unfilteredOptions, 'populateDefaults'),
+            self = this;
 
-        options = _.merge({}, options || {}, internalContext);
+        if (!options.context) {
+            options.context = internalContext.context;
+        }
 
         return this
             .findAll(options)
             .then(function checkAllSettings(allSettings) {
-                var usedKeys = allSettings.models.map(function mapper(setting) { return setting.get('key'); }),
+                var usedKeys = allSettings.models.map(function mapper(setting) {
+                        return setting.get('key');
+                    }),
                     insertOperations = [];
 
                 _.each(getDefaultSettings(), function forEachDefault(defaultSetting, defaultSettingKey) {

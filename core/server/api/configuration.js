@@ -2,11 +2,11 @@
 // RESTful API for browsing the configuration
 var Promise = require('bluebird'),
     _ = require('lodash'),
-    apiUtils = require('../utils'),
+    urlService = require('../services/url'),
     models = require('../models'),
     config = require('../config'),
-    settingsCache = require('../settings/cache'),
-    ghostVersion = require('../utils/ghost-version'),
+    settingsCache = require('../services/settings/cache'),
+    ghostVersion = require('../lib/ghost-version'),
     configuration;
 
 function fetchAvailableTimezones() {
@@ -25,12 +25,13 @@ function getAboutConfig() {
 
 function getBaseConfig() {
     return {
-        useGravatar:    !config.isPrivacyDisabled('useGravatar'),
-        publicAPI:      config.get('publicAPI') === true,
-        blogUrl:        apiUtils.url.urlFor('home', true),
-        blogTitle:      settingsCache.get('title'),
-        routeKeywords:  config.get('routeKeywords'),
-        clientExtensions: config.get('clientExtensions')
+        useGravatar: !config.isPrivacyDisabled('useGravatar'),
+        publicAPI: config.get('publicAPI') === true,
+        blogUrl: urlService.utils.urlFor('home', true),
+        blogTitle: settingsCache.get('title'),
+        routeKeywords: config.get('routeKeywords'),
+        clientExtensions: config.get('clientExtensions'),
+        enableDeveloperExperiments: config.get('enableDeveloperExperiments')
     };
 }
 
@@ -39,7 +40,7 @@ function getBaseConfig() {
  *
  * We need to load the client credentials dynamically.
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 configuration = {
 

@@ -7,17 +7,23 @@ const debug = require('ghost-ignition').debug('importer:tags'),
     models = require('../../../../models');
 
 class TagsImporter extends BaseImporter {
-    constructor(options) {
-        super(_.extend(options, {
+    constructor(allDataFromFile) {
+        super(allDataFromFile, {
             modelName: 'Tag',
-            dataKeyToImport: 'tags',
-            requiredData: []
-        }));
+            dataKeyToImport: 'tags'
+        });
 
         // Map legacy keys
         this.legacyKeys = {
             image: 'feature_image'
         };
+    }
+
+    fetchExisting(modelOptions) {
+        return models.Tag.findAll(_.merge({columns: ['id', 'slug']}, modelOptions))
+            .then((existingData) => {
+                this.existingData = existingData.toJSON();
+            });
     }
 
     beforeImport() {
@@ -29,32 +35,47 @@ class TagsImporter extends BaseImporter {
      * Find tag before adding.
      * Background:
      *   - the tag model is smart enough to regenerate unique fields
-     *   - so if you import a tag name "test" and the same tag name exists, it would add "test-2"
-     *   - that's we add a protection here to first find the tag
+     *   - so if you import a tag slug "test" and the same tag slug exists, it would add "test-2"
+     *   - that's why we add a protection here to first find the tag
+     *
+     * @TODO: Add a flag to the base implementation e.g. `fetchBeforeAdd`
      */
-    doImport(options) {
+    doImport(options, importOptions) {
         debug('doImport', this.modelName, this.dataToImport.length);
 
-        let self = this, ops = [];
+        let ops = [];
 
-        this.dataToImport = this.dataToImport.map(self.legacyMapper);
+        this.dataToImport = this.dataToImport.map(this.legacyMapper);
 
-        _.each(this.dataToImport, function (obj) {
-            ops.push(models[self.modelName].findOne({name: obj.name}, options).then(function (tag) {
-                if (tag) {
-                    return Promise.resolve();
-                }
+        _.each(this.dataToImport, (obj) => {
+            ops.push(models[this.modelName].findOne({name: obj.name}, options)
+                .then((tag) => {
+                    if (tag) {
+                        return Promise.resolve();
+                    }
 
-                return models[self.modelName].add(obj, options)
-                    .then(function (newModel) {
-                        obj.model = newModel.toJSON();
-                        self.importedData.push(obj.model);
-                        return newModel;
-                    })
-                    .catch(function (err) {
-                        return self.handleError(err, obj);
-                    });
-            }).reflect());
+                    return models[this.modelName].add(obj, options)
+                        .then((importedModel) => {
+                            obj.model = {
+                                id: importedModel.id
+                            };
+
+                            if (importOptions.returnImportedData) {
+                                this.importedDataToReturn.push(importedModel.toJSON());
+                            }
+
+                            // for identifier lookup
+                            this.importedData.push({
+                                id: importedModel.id,
+                                slug: importedModel.get('slug')
+                            });
+
+                            return importedModel;
+                        })
+                        .catch((err) => {
+                            return this.handleError(err, obj);
+                        });
+                }).reflect());
         });
 
         return Promise.all(ops);

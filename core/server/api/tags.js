@@ -2,11 +2,10 @@
 // RESTful API for the Tag resource
 var Promise = require('bluebird'),
     _ = require('lodash'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
     models = require('../models'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
+    common = require('../lib/common'),
     docName = 'tags',
     allowedIncludes = ['count.posts'],
     tags;
@@ -14,7 +13,7 @@ var Promise = require('bluebird'),
 /**
  * ### Tags API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 tags = {
     /**
@@ -37,9 +36,9 @@ tags = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.browseDefaultOptions}),
-            apiUtils.handlePublicPermissions(docName, 'browse'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: localUtils.browseDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'browse'),
             doQuery
         ];
 
@@ -66,8 +65,8 @@ tags = {
             return models.Tag.findOne(options.data, _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.tags.tagNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.tags.tagNotFound')
                         }));
                     }
 
@@ -79,9 +78,9 @@ tags = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {attrs: attrs}),
-            apiUtils.handlePublicPermissions(docName, 'read'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {attrs: attrs}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePublicPermissions(docName, 'read'),
             doQuery
         ];
 
@@ -114,9 +113,9 @@ tags = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName),
-            apiUtils.handlePermissions(docName, 'add'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePermissions(docName, 'add'),
             doQuery
         ];
 
@@ -144,8 +143,8 @@ tags = {
             return models.Tag.edit(options.data.tags[0], _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.tags.tagNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.tags.tagNotFound')
                         }));
                     }
 
@@ -157,9 +156,9 @@ tags = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'edit'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: localUtils.idDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePermissions(docName, 'edit'),
             doQuery
         ];
 
@@ -188,9 +187,9 @@ tags = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'destroy'),
-            apiUtils.convertOptions(allowedIncludes),
+            localUtils.validate(docName, {opts: localUtils.idDefaultOptions}),
+            localUtils.convertOptions(allowedIncludes),
+            localUtils.handlePermissions(docName, 'destroy'),
             deleteTag
         ];
 

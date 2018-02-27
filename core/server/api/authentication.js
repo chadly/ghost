@@ -1,17 +1,16 @@
 var Promise = require('bluebird'),
     _ = require('lodash'),
     validator = require('validator'),
-    pipeline = require('../utils/pipeline'),
-    mail = require('./../mail'),
-    globalUtils = require('../utils'),
-    apiUtils = require('./utils'),
-    models = require('../models'),
     config = require('../config'),
-    errors = require('../errors'),
-    events = require('../events'),
-    i18n = require('../i18n'),
-    logging = require('../logging'),
-    spamPrevention = require('../middleware/api/spam-prevention'),
+    common = require('../lib/common'),
+    security = require('../lib/security'),
+    constants = require('../lib/constants'),
+    pipeline = require('../lib/promise/pipeline'),
+    mail = require('../services/mail'),
+    urlService = require('../services/url'),
+    localUtils = require('./utils'),
+    models = require('../models'),
+    spamPrevention = require('../web/middleware/api/spam-prevention'),
     mailAPI = require('./mail'),
     settingsAPI = require('./settings'),
     authentication,
@@ -41,11 +40,11 @@ function assertSetupCompleted(status) {
                 return __;
             }
 
-            var completed = i18n.t('errors.api.authentication.setupAlreadyCompleted'),
-                notCompleted = i18n.t('errors.api.authentication.setupMustBeCompleted');
+            var completed = common.i18n.t('errors.api.authentication.setupAlreadyCompleted'),
+                notCompleted = common.i18n.t('errors.api.authentication.setupMustBeCompleted');
 
             function throwReason(reason) {
-                throw new errors.NoPermissionError({message: reason});
+                throw new common.errors.NoPermissionError({message: reason});
             }
 
             if (isSetup) {
@@ -61,7 +60,7 @@ function setupTasks(setupData) {
     var tasks;
 
     function validateData(setupData) {
-        return apiUtils.checkObject(setupData, 'setup').then(function then(checked) {
+        return localUtils.checkObject(setupData, 'setup').then(function then(checked) {
             var data = checked.setup[0];
 
             return {
@@ -80,8 +79,8 @@ function setupTasks(setupData) {
 
         return User.findOne({role: 'Owner', status: 'all'}).then(function then(owner) {
             if (!owner) {
-                throw new errors.GhostError({
-                    message: i18n.t('errors.api.authentication.setupUnableToRun')
+                throw new common.errors.GhostError({
+                    message: common.i18n.t('errors.api.authentication.setupUnableToRun')
                 });
             }
 
@@ -106,7 +105,7 @@ function setupTasks(setupData) {
 
         userSettings = [
             {key: 'title', value: blogTitle.trim()},
-            {key: 'description', value: i18n.t('common.api.authentication.sampleBlogDescription')}
+            {key: 'description', value: common.i18n.t('common.api.authentication.sampleBlogDescription')}
         ];
 
         return settingsAPI.edit({settings: userSettings}, context).return(user);
@@ -129,7 +128,7 @@ function setupTasks(setupData) {
 /**
  * ## Authentication API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](events.js.html#api%20methods)
  */
 authentication = {
     /**
@@ -141,12 +140,12 @@ authentication = {
         var tasks;
 
         function validateRequest(object) {
-            return apiUtils.checkObject(object, 'passwordreset').then(function then(data) {
+            return localUtils.checkObject(object, 'passwordreset').then(function then(data) {
                 var email = data.passwordreset[0].email;
 
                 if (typeof email !== 'string' || !validator.isEmail(email)) {
-                    throw new errors.BadRequestError({
-                        message: i18n.t('errors.api.authentication.noEmailProvided')
+                    throw new common.errors.BadRequestError({
+                        message: common.i18n.t('errors.api.authentication.noEmailProvided')
                     });
                 }
 
@@ -166,11 +165,11 @@ authentication = {
                 })
                 .then(function fetchedUser(user) {
                     if (!user) {
-                        throw new errors.NotFoundError({message: i18n.t('errors.api.users.userNotFound')});
+                        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.users.userNotFound')});
                     }
 
-                    token = globalUtils.tokens.resetToken.generateHash({
-                        expires: Date.now() + globalUtils.ONE_DAY_MS,
+                    token = security.tokens.resetToken.generateHash({
+                        expires: Date.now() + constants.ONE_DAY_MS,
                         email: email,
                         dbHash: dbHash,
                         password: user.get('password')
@@ -184,8 +183,8 @@ authentication = {
         }
 
         function sendResetNotification(data) {
-            var adminUrl = globalUtils.url.urlFor('admin', true),
-                resetUrl = globalUtils.url.urlJoin(adminUrl, 'reset', globalUtils.encodeBase64URLsafe(data.resetToken), '/');
+            var adminUrl = urlService.utils.urlFor('admin', true),
+                resetUrl = urlService.utils.urlJoin(adminUrl, 'reset', security.url.encodeBase64(data.resetToken), '/');
 
             return mail.utils.generateContent({
                 data: {
@@ -197,7 +196,7 @@ authentication = {
                     mail: [{
                         message: {
                             to: data.email,
-                            subject: i18n.t('common.api.authentication.mail.resetPassword'),
+                            subject: common.i18n.t('common.api.authentication.mail.resetPassword'),
                             html: content.html,
                             text: content.text
                         },
@@ -212,7 +211,7 @@ authentication = {
         function formatResponse() {
             return {
                 passwordreset: [
-                    {message: i18n.t('common.api.authentication.mail.checkEmailForInstructions')}
+                    {message: common.i18n.t('common.api.authentication.mail.checkEmailForInstructions')}
                 ]
             };
         }
@@ -238,13 +237,13 @@ authentication = {
         var tasks, tokenIsCorrect, dbHash, options = {context: {internal: true}}, tokenParts;
 
         function validateRequest() {
-            return apiUtils.validate('passwordreset')(object, options)
+            return localUtils.validate('passwordreset')(object, options)
                 .then(function (options) {
                     var data = options.data.passwordreset[0];
 
                     if (data.newPassword !== data.ne2Password) {
-                        return Promise.reject(new errors.ValidationError({
-                            message: i18n.t('errors.models.user.newPasswordsDoNotMatch')
+                        return Promise.reject(new common.errors.ValidationError({
+                            message: common.i18n.t('errors.models.user.newPasswordsDoNotMatch')
                         }));
                     }
 
@@ -253,15 +252,15 @@ authentication = {
         }
 
         function extractTokenParts(options) {
-            options.data.passwordreset[0].token = globalUtils.decodeBase64URLsafe(options.data.passwordreset[0].token);
+            options.data.passwordreset[0].token = security.url.decodeBase64(options.data.passwordreset[0].token);
 
-            tokenParts = globalUtils.tokens.resetToken.extract({
+            tokenParts = security.tokens.resetToken.extract({
                 token: options.data.passwordreset[0].token
             });
 
             if (!tokenParts) {
-                return Promise.reject(new errors.UnauthorizedError({
-                    message: i18n.t('errors.api.common.invalidTokenStructure')
+                return Promise.reject(new common.errors.UnauthorizedError({
+                    message: common.i18n.t('errors.api.common.invalidTokenStructure')
                 }));
             }
 
@@ -272,8 +271,8 @@ authentication = {
         function protectBruteForce(options) {
             if (tokenSecurity[tokenParts.email + '+' + tokenParts.expires] &&
                 tokenSecurity[tokenParts.email + '+' + tokenParts.expires].count >= 10) {
-                return Promise.reject(new errors.NoPermissionError({
-                    message: i18n.t('errors.models.user.tokenLocked')
+                return Promise.reject(new common.errors.NoPermissionError({
+                    message: common.i18n.t('errors.models.user.tokenLocked')
                 }));
             }
 
@@ -286,7 +285,7 @@ authentication = {
                 oldPassword = data.oldPassword,
                 newPassword = data.newPassword;
 
-            return settingsAPI.read(_.merge({key: 'db_hash'}, options))
+            return settingsAPI.read(_.merge({key: 'db_hash'}, _.omit(options, 'data')))
                 .then(function fetchedSettings(response) {
                     dbHash = response.settings[0].value;
 
@@ -294,18 +293,18 @@ authentication = {
                 })
                 .then(function fetchedUser(user) {
                     if (!user) {
-                        throw new errors.NotFoundError({message: i18n.t('errors.api.users.userNotFound')});
+                        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.users.userNotFound')});
                     }
 
-                    tokenIsCorrect = globalUtils.tokens.resetToken.compare({
+                    tokenIsCorrect = security.tokens.resetToken.compare({
                         token: resetToken,
                         dbHash: dbHash,
                         password: user.get('password')
                     });
 
                     if (!tokenIsCorrect) {
-                        return Promise.reject(new errors.BadRequestError({
-                            message: i18n.t('errors.api.common.invalidTokenStructure')
+                        return Promise.reject(new common.errors.BadRequestError({
+                            message: common.i18n.t('errors.api.common.invalidTokenStructure')
                         }));
                     }
 
@@ -321,21 +320,21 @@ authentication = {
                     updatedUser.set('status', 'active');
                     return updatedUser.save(options);
                 })
-                .catch(errors.ValidationError, function (err) {
+                .catch(common.errors.ValidationError, function (err) {
                     return Promise.reject(err);
                 })
                 .catch(function (err) {
-                    if (errors.utils.isIgnitionError(err)) {
+                    if (common.errors.utils.isIgnitionError(err)) {
                         return Promise.reject(err);
                     }
-                    return Promise.reject(new errors.UnauthorizedError({err: err}));
+                    return Promise.reject(new common.errors.UnauthorizedError({err: err}));
                 });
         }
 
         function formatResponse() {
             return {
                 passwordreset: [
-                    {message: i18n.t('common.api.authentication.mail.passwordChanged')}
+                    {message: common.i18n.t('common.api.authentication.mail.passwordChanged')}
                 ]
             };
         }
@@ -361,22 +360,22 @@ authentication = {
         var tasks, invite, options = {context: {internal: true}};
 
         function validateInvitation(invitation) {
-            return apiUtils.checkObject(invitation, 'invitation')
+            return localUtils.checkObject(invitation, 'invitation')
                 .then(function () {
                     if (!invitation.invitation[0].token) {
-                        return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.authentication.noTokenProvided')}));
+                        return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.authentication.noTokenProvided')}));
                     }
 
                     if (!invitation.invitation[0].email) {
-                        return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.authentication.noEmailProvided')}));
+                        return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.authentication.noEmailProvided')}));
                     }
 
                     if (!invitation.invitation[0].password) {
-                        return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.authentication.noPasswordProvided')}));
+                        return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.authentication.noPasswordProvided')}));
                     }
 
                     if (!invitation.invitation[0].name) {
-                        return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.authentication.noNameProvided')}));
+                        return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.authentication.noNameProvided')}));
                     }
 
                     return invitation;
@@ -384,18 +383,18 @@ authentication = {
         }
 
         function processInvitation(invitation) {
-            var data = invitation.invitation[0], inviteToken = globalUtils.decodeBase64URLsafe(data.token);
+            var data = invitation.invitation[0], inviteToken = security.url.decodeBase64(data.token);
 
             return models.Invite.findOne({token: inviteToken, status: 'sent'}, options)
                 .then(function (_invite) {
                     invite = _invite;
 
                     if (!invite) {
-                        throw new errors.NotFoundError({message: i18n.t('errors.api.invites.inviteNotFound')});
+                        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.inviteNotFound')});
                     }
 
                     if (invite.get('expires') < Date.now()) {
-                        throw new errors.NotFoundError({message: i18n.t('errors.api.invites.inviteExpired')});
+                        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.inviteExpired')});
                     }
 
                     return models.User.add({
@@ -413,7 +412,7 @@ authentication = {
         function formatResponse() {
             return {
                 invitation: [
-                    {message: i18n.t('common.api.authentication.mail.invitationAccepted')}
+                    {message: common.i18n.t('common.api.authentication.mail.invitationAccepted')}
                 ]
             };
         }
@@ -441,8 +440,8 @@ authentication = {
             var email = options.email;
 
             if (typeof email !== 'string' || !validator.isEmail(email)) {
-                throw new errors.BadRequestError({
-                    message: i18n.t('errors.api.authentication.invalidEmailReceived')
+                throw new common.errors.BadRequestError({
+                    message: common.i18n.t('errors.api.authentication.invalidEmailReceived')
                 });
             }
 
@@ -485,15 +484,17 @@ authentication = {
         }
 
         function formatResponse(isSetup) {
-            return {setup: [
-                {
-                    status: isSetup,
-                    // Pre-populate from config if, and only if the values exist in config.
-                    title: config.title || undefined,
-                    name: config.user_name || undefined,
-                    email: config.user_email || undefined
-                }
-            ]};
+            return {
+                setup: [
+                    {
+                        status: isSetup,
+                        // Pre-populate from config if, and only if the values exist in config.
+                        title: config.title || undefined,
+                        name: config.user_name || undefined,
+                        email: config.user_email || undefined
+                    }
+                ]
+            };
         }
 
         tasks = [
@@ -521,13 +522,13 @@ authentication = {
                 ownerEmail: setupUser.email
             };
 
-            events.emit('setup.completed', setupUser);
+            common.events.emit('setup.completed', setupUser);
 
             return mail.utils.generateContent({data: data, template: 'welcome'})
                 .then(function then(content) {
                     var message = {
                             to: setupUser.email,
-                            subject: i18n.t('common.api.authentication.mail.yourNewGhostBlog'),
+                            subject: common.i18n.t('common.api.authentication.mail.yourNewGhostBlog'),
                             html: content.html,
                             text: content.text
                         },
@@ -540,8 +541,8 @@ authentication = {
 
                     mailAPI.send(payload, {context: {internal: true}})
                         .catch(function (err) {
-                            err.context = i18n.t('errors.api.authentication.unableToSendWelcomeEmail');
-                            logging.error(err);
+                            err.context = common.i18n.t('errors.api.authentication.unableToSendWelcomeEmail');
+                            common.logging.error(err);
                         });
                 })
                 .return(setupUser);
@@ -573,7 +574,7 @@ authentication = {
 
         function processArgs(setupDetails, options) {
             if (!options.context || !options.context.user) {
-                throw new errors.NoPermissionError({message: i18n.t('errors.api.authentication.notTheBlogOwner')});
+                throw new common.errors.NoPermissionError({message: common.i18n.t('errors.api.authentication.notTheBlogOwner')});
             }
 
             return _.assign({setupDetails: setupDetails}, options);
@@ -583,7 +584,7 @@ authentication = {
             return models.User.findOne({role: 'Owner', status: 'all'})
                 .then(function (owner) {
                     if (owner.id !== options.context.user) {
-                        throw new errors.NoPermissionError({message: i18n.t('errors.api.authentication.notTheBlogOwner')});
+                        throw new common.errors.NoPermissionError({message: common.i18n.t('errors.api.authentication.notTheBlogOwner')});
                     }
 
                     return options.setupDetails;
@@ -633,15 +634,15 @@ authentication = {
                         if (!providers.length) {
                             return {
                                 token: tokenDetails.token,
-                                error: i18n.t('errors.api.authentication.invalidTokenProvided')
+                                error: common.i18n.t('errors.api.authentication.invalidTokenProvided')
                             };
                         }
 
                         return destroyToken(providers.pop(), options, providers);
                     })
                     .catch(function () {
-                        throw new errors.TokenRevocationError({
-                            message: i18n.t('errors.api.authentication.tokenRevocationFailed')
+                        throw new common.errors.TokenRevocationError({
+                            message: common.i18n.t('errors.api.authentication.tokenRevocationFailed')
                         });
                     });
             }

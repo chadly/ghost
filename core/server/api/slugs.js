@@ -1,11 +1,10 @@
 // # Slug API
 // RESTful API for the Slug resource
 var Promise = require('bluebird'),
-    pipeline = require('../utils/pipeline'),
-    apiUtils = require('./utils'),
+    pipeline = require('../lib/promise/pipeline'),
+    localUtils = require('./utils'),
     models = require('../models'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
+    common = require('../lib/common'),
     docName = 'slugs',
     slugs,
     allowedTypes;
@@ -13,7 +12,7 @@ var Promise = require('bluebird'),
 /**
  * ## Slugs API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 slugs = {
 
@@ -45,7 +44,7 @@ slugs = {
          */
         function checkAllowedTypes(options) {
             if (allowedTypes[options.type] === undefined) {
-                return Promise.reject(new errors.BadRequestError({message: i18n.t('errors.api.slugs.unknownSlugType', {type: options.type})}));
+                return Promise.reject(new common.errors.BadRequestError({message: common.i18n.t('errors.api.slugs.unknownSlugType', {type: options.type})}));
             }
             return options;
         }
@@ -60,8 +59,8 @@ slugs = {
             return models.Base.Model.generateSlug(allowedTypes[options.type], options.data.name, {status: 'all'})
                 .then(function onModelResponse(slug) {
                     if (!slug) {
-                        return Promise.reject(new errors.GhostError({
-                            message: i18n.t('errors.api.slugs.couldNotGenerateSlug')
+                        return Promise.reject(new common.errors.GhostError({
+                            message: common.i18n.t('errors.api.slugs.couldNotGenerateSlug')
                         }));
                     }
 
@@ -73,8 +72,9 @@ slugs = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: opts, attrs: attrs}),
-            apiUtils.handlePermissions(docName, 'generate'),
+            localUtils.validate(docName, {opts: opts, attrs: attrs}),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'generate'),
             checkAllowedTypes,
             modelQuery
         ];

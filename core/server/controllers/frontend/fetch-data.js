@@ -5,7 +5,7 @@
 var api = require('../../api'),
     _   = require('lodash'),
     Promise = require('bluebird'),
-    themes = require('../../themes'),
+    themes = require('../../services/themes'),
     queryDefaults,
     defaultPostQuery = {};
 
@@ -86,7 +86,7 @@ function processQuery(query, slugParam) {
 function fetchData(channelOptions) {
     // @TODO improve this further
     var pageOptions = channelOptions.isRSS ?
-        {options: channelOptions.postOptions} : fetchPostsPerPage(channelOptions.postOptions),
+            {options: channelOptions.postOptions} : fetchPostsPerPage(channelOptions.postOptions),
         postQuery,
         props = {};
 

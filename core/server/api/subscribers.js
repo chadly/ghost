@@ -2,20 +2,19 @@
 // RESTful API for the Tag resource
 var Promise = require('bluebird'),
     _ = require('lodash'),
-    fs = require('fs'),
-    pipeline = require('../utils/pipeline'),
-    globalUtils = require('../utils'),
-    apiUtils = require('./utils'),
+    fs = require('fs-extra'),
+    pipeline = require('../lib/promise/pipeline'),
+    fsLib = require('../lib/fs'),
+    localUtils = require('./utils'),
     models = require('../models'),
-    errors = require('../errors'),
-    i18n = require('../i18n'),
+    common = require('../lib/common'),
     docName = 'subscribers',
     subscribers;
 
 /**
  * ### Subscribers API Methods
  *
- * **See:** [API Methods](index.js.html#api%20methods)
+ * **See:** [API Methods](constants.js.html#api%20methods)
  */
 subscribers = {
     /**
@@ -38,8 +37,9 @@ subscribers = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.browseDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'browse'),
+            localUtils.validate(docName, {opts: localUtils.browseDefaultOptions}),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'browse'),
             doQuery
         ];
 
@@ -53,7 +53,7 @@ subscribers = {
      * @return {Promise<Subscriber>} Subscriber
      */
     read: function read(options) {
-        var attrs = ['id'],
+        var attrs = ['id', 'email'],
             tasks;
 
         /**
@@ -66,8 +66,8 @@ subscribers = {
             return models.Subscriber.findOne(options.data, _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.subscribers.subscriberNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.subscribers.subscriberNotFound')
                         }));
                     }
 
@@ -79,8 +79,9 @@ subscribers = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {attrs: attrs}),
-            apiUtils.handlePermissions(docName, 'read'),
+            localUtils.validate(docName, {attrs: attrs}),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'read'),
             doQuery
         ];
 
@@ -109,12 +110,12 @@ subscribers = {
                         // we don't expose this information
                         return Promise.resolve(subscriber);
                     } else if (subscriber) {
-                        return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.subscribers.subscriberAlreadyExists')}));
+                        return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.subscribers.subscriberAlreadyExists')}));
                     }
 
                     return models.Subscriber.add(options.data.subscribers[0], _.omit(options, ['data'])).catch(function (error) {
                         if (error.code && error.message.toLowerCase().indexOf('unique') !== -1) {
-                            return Promise.reject(new errors.ValidationError({message: i18n.t('errors.api.subscribers.subscriberAlreadyExists')}));
+                            return Promise.reject(new common.errors.ValidationError({message: common.i18n.t('errors.api.subscribers.subscriberAlreadyExists')}));
                         }
 
                         return Promise.reject(error);
@@ -129,8 +130,9 @@ subscribers = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName),
-            apiUtils.handlePermissions(docName, 'add'),
+            localUtils.validate(docName),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'add'),
             doQuery
         ];
 
@@ -158,8 +160,8 @@ subscribers = {
             return models.Subscriber.edit(options.data.subscribers[0], _.omit(options, ['data']))
                 .then(function onModelResponse(model) {
                     if (!model) {
-                        return Promise.reject(new errors.NotFoundError({
-                            message: i18n.t('errors.api.subscribers.subscriberNotFound')
+                        return Promise.reject(new common.errors.NotFoundError({
+                            message: common.i18n.t('errors.api.subscribers.subscriberNotFound')
                         }));
                     }
 
@@ -171,8 +173,9 @@ subscribers = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'edit'),
+            localUtils.validate(docName, {opts: localUtils.idDefaultOptions}),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'edit'),
             doQuery
         ];
 
@@ -192,6 +195,29 @@ subscribers = {
 
         /**
          * ### Delete Subscriber
+         * If we have an email param, check the subscriber exists
+         * @type {[type]}
+         */
+        function getSubscriberByEmail(options) {
+            if (options.email) {
+                return models.Subscriber.getByEmail(options.email, options)
+                    .then(function (subscriber) {
+                        if (!subscriber) {
+                            return Promise.reject(new common.errors.NotFoundError({
+                                message: common.i18n.t('errors.api.subscribers.subscriberNotFound')
+                            }));
+                        }
+
+                        options.id = subscriber.get('id');
+                        return options;
+                    });
+            }
+
+            return options;
+        }
+
+        /**
+         * ### Delete Subscriber
          * Make the call to the Model layer
          * @param {Object} options
          */
@@ -201,8 +227,10 @@ subscribers = {
 
         // Push all of our tasks into a `tasks` array in the correct order
         tasks = [
-            apiUtils.validate(docName, {opts: apiUtils.idDefaultOptions}),
-            apiUtils.handlePermissions(docName, 'destroy'),
+            localUtils.validate(docName, {opts: ['id', 'email']}),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'destroy'),
+            getSubscriberByEmail,
             doQuery
         ];
 
@@ -251,12 +279,13 @@ subscribers = {
             return models.Subscriber.findAll(options).then(function (data) {
                 return formatCSV(data.toJSON(options));
             }).catch(function (err) {
-                return Promise.reject(new errors.GhostError({err: err}));
+                return Promise.reject(new common.errors.GhostError({err: err}));
             });
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'browse'),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'browse'),
             exportSubscribers
         ];
 
@@ -281,7 +310,7 @@ subscribers = {
                 invalid = 0,
                 duplicates = 0;
 
-            return globalUtils.readCSV({
+            return fsLib.readCSV({
                 path: filePath,
                 columnsToExtract: [{name: 'email', lookup: /email/i}]
             }).then(function (result) {
@@ -294,7 +323,7 @@ subscribers = {
                     if (inspection.isFulfilled()) {
                         fulfilled = fulfilled + 1;
                     } else {
-                        if (inspection.reason() instanceof errors.ValidationError) {
+                        if (inspection.reason() instanceof common.errors.ValidationError) {
                             duplicates = duplicates + 1;
                         } else {
                             invalid = invalid + 1;
@@ -313,12 +342,13 @@ subscribers = {
                 };
             }).finally(function () {
                 // Remove uploaded file from tmp location
-                return Promise.promisify(fs.unlink)(filePath);
+                return fs.unlink(filePath);
             });
         }
 
         tasks = [
-            apiUtils.handlePermissions(docName, 'add'),
+            localUtils.convertOptions(),
+            localUtils.handlePermissions(docName, 'add'),
             importCSV
         ];
 

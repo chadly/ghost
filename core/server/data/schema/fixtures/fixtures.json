@@ -159,6 +159,10 @@
                     "description":      "Authors"
                 },
                 {
+                    "name":             "Contributor",
+                    "description":      "Contributors"
+                },
+                {
                     "name":             "Owner",
                     "description":      "Blog Owner"
                 }
@@ -421,6 +425,16 @@
                     "name": "Upload redirects",
                     "action_type": "upload",
                     "object_type": "redirect"
+                },
+                {
+                    "name": "Add webhooks",
+                    "action_type": "add",
+                    "object_type": "webhook"
+                },
+                {
+                    "name": "Delete webhooks",
+                    "action_type": "destroy",
+                    "object_type": "webhook"
                 }
             ]
         },
@@ -438,6 +452,7 @@
                     "id": "5951f5fca366002ebd5dbef7",
                     "name": "Ghost",
                     "email": "ghost-author@example.com",
+                    "bio": "You can delete this user to remove all the welcome posts",
                     "status": "active",
                     "roles": ["Author"]
                 }
@@ -471,7 +486,8 @@
                     "client": "all",
                     "subscriber": "all",
                     "invite": "all",
-                    "redirect": "all"
+                    "redirect": "all",
+                    "webhook": "all"
                 },
                 "Editor": {
                     "post": "all",
@@ -490,6 +506,17 @@
                     "setting": ["browse", "read"],
                     "slug": "all",
                     "tag": ["browse", "read", "add"],
+                    "user": ["browse", "read"],
+                    "role": ["browse"],
+                    "client": "all",
+                    "subscriber": ["add"],
+                    "theme": ["browse"]
+                },
+                "Contributor": {
+                    "post": ["browse", "read", "add"],
+                    "setting": ["browse", "read"],
+                    "slug": "all",
+                    "tag": ["browse", "read"],
                     "user": ["browse", "read"],
                     "role": ["browse"],
                     "client": "all",

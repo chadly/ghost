@@ -1,19 +1,16 @@
-var config = require('../../config'),
-    events = require(config.get('paths:corePath') + '/server/events'),
-    models = require(config.get('paths:corePath') + '/server/models'),
-    errors = require(config.get('paths:corePath') + '/server/errors'),
-    logging = require(config.get('paths:corePath') + '/server/logging'),
-    sequence = require(config.get('paths:corePath') + '/server/utils/sequence'),
-    moment = require('moment-timezone'),
-    _ = require('lodash');
+var moment = require('moment-timezone'),
+    _ = require('lodash'),
+    models = require('../../models'),
+    common = require('../../lib/common'),
+    sequence = require('../../lib/promise/sequence');
 
 /**
  * WHEN access token is created we will update last_seen for user.
  */
-events.on('token.added', function (tokenModel) {
+common.events.on('token.added', function (tokenModel) {
     models.User.edit({last_seen: moment().toDate()}, {id: tokenModel.get('user_id')})
         .catch(function (err) {
-            logging.error(new errors.GhostError({err: err, level: 'critical'}));
+            common.logging.error(new common.errors.GhostError({err: err, level: 'critical'}));
         });
 });
 
@@ -26,7 +23,7 @@ events.on('token.added', function (tokenModel) {
  *   - if an active user get's deleted, we have to access the previous attributes, because this is how bookshelf works
  *     if you delete a user.
  */
-events.on('user.deactivated', function (userModel, options) {
+common.events.on('user.deactivated', function (userModel, options) {
     options = options || {};
     options = _.merge({}, options, {id: userModel.id || userModel.previousAttributes().id});
 
@@ -34,12 +31,12 @@ events.on('user.deactivated', function (userModel, options) {
         return;
     }
 
-    models.Accesstoken.destroyByUser(options)
+    models.Accesstoken.destroyByUser(_.omit(options, 'transacting'))
         .then(function () {
-            return models.Refreshtoken.destroyByUser(options);
+            return models.Refreshtoken.destroyByUser(_.omit(options, 'transacting'));
         })
         .catch(function (err) {
-            logging.error(new errors.GhostError({
+            common.logging.error(new common.errors.GhostError({
                 err: err,
                 level: 'critical'
             }));
@@ -51,7 +48,7 @@ events.on('user.deactivated', function (userModel, options) {
  * - reschedule all scheduled posts
  * - draft scheduled posts, when the published_at would be in the past
  */
-events.on('settings.active_timezone.edited', function (settingModel, options) {
+common.events.on('settings.active_timezone.edited', function (settingModel, options) {
     options = options || {};
     options = _.merge({}, options, {context: {internal: true}});
 
@@ -109,17 +106,53 @@ events.on('settings.active_timezone.edited', function (settingModel, options) {
                     };
                 })).each(function (result) {
                     if (!result.isFulfilled()) {
-                        logging.error(new errors.GhostError({
+                        common.logging.error(new common.errors.GhostError({
                             err: result.reason()
                         }));
                     }
                 });
             })
             .catch(function (err) {
-                logging.error(new errors.GhostError({
+                common.logging.error(new common.errors.GhostError({
                     err: err,
                     level: 'critical'
                 }));
             });
+    });
+});
+
+/**
+ * Remove all notifications, which are seen, older than 3 months.
+ * No transaction, because notifications are not sensitive and we would have to add `forUpdate`
+ * to the settings model to create real lock.
+ */
+common.events.on('settings.notifications.edited', function (settingModel) {
+    var allNotifications = JSON.parse(settingModel.attributes.value || []),
+        options = {context: {internal: true}},
+        skip = true;
+
+    allNotifications = allNotifications.filter(function (notification) {
+        // Do not delete the release notification
+        if (notification.hasOwnProperty('custom') && !notification.custom) {
+            return true;
+        }
+
+        if (notification.seen && moment().diff(moment(notification.addedAt), 'month') > 2) {
+            skip = false;
+            return false;
+        }
+
+        return true;
+    });
+
+    if (skip) {
+        return;
+    }
+
+    return models.Settings.edit({
+        key: 'notifications',
+        value: JSON.stringify(allNotifications)
+    }, options).catch(function (err) {
+        common.errors.logError(err);
     });
 });

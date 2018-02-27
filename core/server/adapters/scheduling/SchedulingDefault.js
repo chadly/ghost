@@ -2,9 +2,8 @@ var util = require('util'),
     moment = require('moment'),
     request = require('superagent'),
     debug = require('ghost-ignition').debug('scheduling-default'),
-    SchedulingBase = require(__dirname + '/SchedulingBase'),
-    errors = require(__dirname + '/../../errors'),
-    logging = require(__dirname + '/../../logging');
+    SchedulingBase = require('./SchedulingBase'),
+    common = require('../../lib/common');
 
 /**
  * allJobs is a sorted list by time attribute
@@ -17,6 +16,7 @@ function SchedulingDefault(options) {
     this.beforePingInMs = -50;
     this.retryTimeoutInMs = 1000 * 5;
 
+    this.rescheduleOnBoot = true;
     this.allJobs = {};
     this.deletedJobs = {};
     this.isRunning = false;
@@ -236,7 +236,7 @@ SchedulingDefault.prototype._pingUrl = function (object) {
                 }, self.retryTimeoutInMs);
             }
 
-            logging.error(new errors.GhostError({
+            common.logging.error(new common.errors.GhostError({
                 err: err,
                 level: 'critical'
             }));

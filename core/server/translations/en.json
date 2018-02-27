@@ -233,7 +233,6 @@
                 "notEnoughPermission": "You do not have permission to perform this action",
                 "noUserWithEnteredEmailAddr": "There is no user with that email address.",
                 "userIsInactive": "The user with that email address is inactive.",
-                "incorrectPasswordAttempts": "Your password is incorrect. <br /> {remaining} attempt{s} remaining!",
                 "userUpdateError": {
                     "emailIsAlreadyInUse": "Email is already in use",
                     "context": "Error thrown from user update during login",
@@ -278,7 +277,7 @@
             },
             "noPermissionToAction": "You do not have permission to perform this action"
         },
-        "update-check": {
+        "updateCheck": {
             "checkingForUpdatesFailed": {
                 "error": "Checking for updates failed, your blog will continue to function.",
                 "help": "If you get this error repeatedly, please seek help from {url}."
@@ -417,6 +416,9 @@
                 },
                 "notAllowedToInviteOwner": "Not allowed to invite an owner user.",
                 "notAllowedToInvite": "Not allowed to invite this role."
+            },
+            "webhooks": {
+                "webhookAlreadyExists": "A webhook for requested event with supplied target_url already exists."
             }
         },
         "data": {
@@ -483,6 +485,8 @@
             "renderingErrorPage": "Rendering Error Page",
             "caughtProcessingError": "Ghost caught a processing error in the middleware layer.",
             "imageNotFound": "Image not found",
+            "imageNotFoundWithRef": "Image not found: {img}",
+            "cannotReadImage": "Could not read image: {img}",
             "pageNotFound": "Page not found",
             "resourceNotFound": "Resource not found"
         }
@@ -521,7 +525,7 @@
                 "isDeprecated": "Warning: pageUrl is deprecated, please use page_url instead\nThe helper pageUrl has been replaced with page_url in Ghost 0.4.2, and will be removed entirely in Ghost 0.6\nIn your theme's pagination.hbs file, pageUrl should be renamed to page_url"
             },
             "pagination": {
-                "invalidData": "pagination data is not an object or is a function",
+                "invalidData": "The \\{\\{pagination\\}\\} helper was used outside of a paginated context. See https://themes.ghost.org/docs/pagination.",
                 "valuesMustBeDefined": "All values must be defined for page, pages, limit and total",
                 "nextPrevValuesMustBeNumeric": "Invalid value, Next/Prev must be a number",
                 "valuesMustBeNumeric": "Invalid value, check page, pages, limit and total are numbers"
@@ -539,13 +543,8 @@
         }
     },
     "notices": {
-        "controllers": {
-            "newVersionAvailable": "Ghost {version} is available! Hot Damn. {link} to upgrade."
-        },
         "index": {
-            "welcomeToGhost": "Welcome to Ghost.",
-            "youAreRunningUnderEnvironment": "You're running under the <strong> {environment} </strong> environment.",
-            "yourURLisSetTo": "Your URL is set to <strong> {url} </strong>."
+            "welcomeToGhost": "Welcome to Ghost."
         },
         "httpServer": {
             "cantTouchThis": "Can't touch this",
@@ -570,9 +569,7 @@
         },
         "data": {
             "fixtures": {
-                "canSafelyDelete": "<!-- You can safely delete this line if your theme does not require jQuery -->\n",
-                "jQueryRemoved": "jQuery has been removed from Ghost core and is now being loaded from the jQuery Foundation's CDN.",
-                "canBeChanged": "This can be changed or removed in your <strong>Code Injection</strong> settings area."
+                "jQueryRemoved": "jQuery has been removed from Ghost core and is now being loaded from the jQuery Foundation's CDN."
             },
             "utils": {
                 "index": {
@@ -586,7 +583,10 @@
                     "valueExceedsMaxLength": "Value in [{tableName}.{columnKey}] exceeds maximum length of {maxlength} characters.",
                     "valueIsNotInteger": "Value in [{tableName}.{columnKey}] is not an integer.",
                     "themeCannotBeActivated": "{themeName} cannot be activated because it is not currently installed.",
-                    "validationFailed": "Validation ({validationName}) failed for {key}"
+                    "validationFailed": "Validation ({validationName}) failed for {key}",
+                    "validationFailedTypes": {
+                        "isLength": "Value in [{tableName}.{key}] exceeds maximum length of {max} characters."
+                    }
                 }
             }
         }
