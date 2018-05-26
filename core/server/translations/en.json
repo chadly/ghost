@@ -205,6 +205,7 @@
                 "notEnoughPermission": "You do not have permission to perform this action"
             },
             "post": {
+                "postNotFound": "Post not found.",
                 "untitled": "(Untitled)",
                 "valueCannotBeBlank": "Value in {key} cannot be blank.",
                 "isAlreadyPublished": "Your post is already published, please reload your page.",
@@ -217,6 +218,7 @@
                 }
             },
             "role": {
+                "roleNotFound": "Role not found",
                 "notEnoughPermission": "You do not have permission to perform this action"
             },
             "settings": {
@@ -372,6 +374,7 @@
                 "noPermissionToEditThemes": "You do not have permission to edit themes.",
                 "themeDoesNotExist": "Theme does not exist.",
                 "invalidTheme": "Theme is not compatible or contains errors.",
+                "invalidThemeName": "Please select a valid theme.",
                 "missingFile": "Please select a theme.",
                 "invalidFile": "Please select a valid zip file.",
                 "overrideCasper": "Please rename your zip, it's not allowed to override the default casper theme.",
@@ -402,6 +405,7 @@
             "utils": {
                 "noPermissionToCall": "You do not have permission to {method} {docName}",
                 "noRootKeyProvided": "No root key ('{docName}') provided.",
+                "invalidStructure": "No valid object structure provided for: {key}",
                 "invalidIdProvided": "Invalid id provided."
             },
             "invites": {
@@ -464,6 +468,14 @@
                     "error": "The {service} service was unable to send a ping request, your blog will continue to function.",
                     "help": "If you get this error repeatedly, please seek help on {url}."
                 }
+            },
+            "settings": {
+                "yaml": {
+                    "error": "Could not parse {file}: {context}.",
+                    "help": "Check your {file} file for typos and fix the named issues."
+                },
+                "loader": "Error trying to load YAML setting for {setting} from '{path}'.",
+                "ensureSettings": "Error trying to access settings files in {path}."
             }
         },
         "errors": {

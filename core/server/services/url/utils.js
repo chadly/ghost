@@ -1,5 +1,3 @@
-'use strict';
-
 // Contains all path information to be used throughout the codebase.
 // Assumes that config.url is set, and is valid
 const moment = require('moment-timezone'),
@@ -173,7 +171,10 @@ function createUrl(urlPath, absolute, secure) {
 function urlPathForPost(post) {
     var output = '',
         permalinks = settingsCache.get('permalinks'),
-        primaryTagFallback = config.get('routeKeywords').primaryTagFallback,
+        // routeKeywords.primaryTagFallback: 'all'
+        primaryTagFallback = 'all',
+        // routeKeywords.primaryAuthorFallback: 'all'
+        primaryAuthorFallback = 'all',
         publishedAtMoment = moment.tz(post.published_at || Date.now(), settingsCache.get('active_timezone')),
         tags = {
             year: function () {
@@ -185,11 +186,17 @@ function urlPathForPost(post) {
             day: function () {
                 return publishedAtMoment.format('DD');
             },
+            /**
+             * @deprecated: `author`, will be removed in Ghost 2.0
+             */
             author: function () {
                 return post.author.slug;
             },
             primary_tag: function () {
                 return post.primary_tag ? post.primary_tag.slug : primaryTagFallback;
+            },
+            primary_author: function () {
+                return post.primary_author ? post.primary_author.slug : primaryAuthorFallback;
             },
             slug: function () {
                 return post.slug;
@@ -265,10 +272,12 @@ function urlFor(context, data, absolute) {
             urlPath = data.post.url;
             secure = data.secure;
         } else if (context === 'tag' && data.tag) {
-            urlPath = urlJoin('/', config.get('routeKeywords').tag, data.tag.slug, '/');
+            // routeKeywords.tag: 'tag'
+            urlPath = urlJoin('/tag', data.tag.slug, '/');
             secure = data.tag.secure;
         } else if (context === 'author' && data.author) {
-            urlPath = urlJoin('/', config.get('routeKeywords').author, data.author.slug, '/');
+            // routeKeywords.author: 'author'
+            urlPath = urlJoin('/author', data.author.slug, '/');
             secure = data.author.secure;
         } else if (context === 'image' && data.image) {
             urlPath = data.image;
@@ -433,6 +442,7 @@ module.exports.isSSL = isSSL;
 module.exports.urlPathForPost = urlPathForPost;
 module.exports.redirectToAdmin = redirectToAdmin;
 module.exports.redirect301 = redirect301;
+module.exports.createUrl = createUrl;
 
 /**
  * If you request **any** image in Ghost, it get's served via

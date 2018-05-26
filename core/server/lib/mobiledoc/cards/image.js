@@ -2,9 +2,29 @@ module.exports = {
     name: 'image',
     type: 'dom',
     render(opts) {
-        var img = opts.env.dom.createElement('img');
-        img.className = 'kg-card-image';
-        img.setAttribute('src', opts.payload.img);
-        return img;
+        let payload = opts.payload;
+        // let version = opts.options.version;
+        let dom = opts.env.dom;
+
+        let figure = dom.createElement('figure');
+        figure.setAttribute('class', 'kg-image-card');
+
+        let img = dom.createElement('img');
+        let imgClass = 'kg-image';
+        if (payload.imageStyle) {
+            imgClass = `${imgClass} kg-image-${payload.imageStyle}`;
+        }
+        img.setAttribute('src', payload.src);
+        img.setAttribute('class', imgClass);
+
+        figure.appendChild(img);
+
+        if (payload.caption) {
+            let figcaption = dom.createElement('figcaption');
+            figcaption.appendChild(dom.createTextNode(payload.caption));
+            figure.appendChild(figcaption);
+        }
+
+        return figure;
     }
 };

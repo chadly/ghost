@@ -1,7 +1,5 @@
-var ghostBookshelf = require('./base'),
-    common = require('../lib/common'),
-    Tag,
-    Tags;
+const ghostBookshelf = require('./base');
+let Tag, Tags;
 
 Tag = ghostBookshelf.Model.extend({
 
@@ -13,20 +11,21 @@ Tag = ghostBookshelf.Model.extend({
         };
     },
 
-    emitChange: function emitChange(event) {
-        common.events.emit('tag' + '.' + event, this);
+    emitChange: function emitChange(event, options) {
+        const eventToTrigger = 'tag' + '.' + event;
+        ghostBookshelf.Model.prototype.emitChange.bind(this)(this, eventToTrigger, options);
     },
 
-    onCreated: function onCreated(model) {
-        model.emitChange('added');
+    onCreated: function onCreated(model, attrs, options) {
+        model.emitChange('added', options);
     },
 
-    onUpdated: function onUpdated(model) {
-        model.emitChange('edited');
+    onUpdated: function onUpdated(model, attrs, options) {
+        model.emitChange('edited', options);
     },
 
-    onDestroyed: function onDestroyed(model) {
-        model.emitChange('deleted');
+    onDestroyed: function onDestroyed(model, options) {
+        model.emitChange('deleted', options);
     },
 
     onSaving: function onSaving(newTag, attr, options) {
@@ -47,6 +46,13 @@ Tag = ghostBookshelf.Model.extend({
                     self.set({slug: slug});
                 });
         }
+    },
+
+    emptyStringProperties: function emptyStringProperties() {
+        // CASE: the client might send empty image properties with "" instead of setting them to null.
+        // This can cause GQL to fail. We therefore enforce 'null' for empty image properties.
+        // See https://github.com/TryGhost/GQL/issues/24
+        return ['feature_image'];
     },
 
     posts: function posts() {
@@ -96,11 +102,15 @@ Tag = ghostBookshelf.Model.extend({
         var options = this.filterOptions(unfilteredOptions, 'destroy', {extraAllowedProperties: ['id']});
         options.withRelated = ['posts'];
 
-        return this.forge({id: options.id}).fetch(options).then(function destroyTagsAndPost(tag) {
-            return tag.related('posts').detach().then(function destroyTags() {
-                return tag.destroy(options);
+        return this.forge({id: options.id})
+            .fetch(options)
+            .then(function destroyTagsAndPost(tag) {
+                return tag.related('posts')
+                    .detach(null, options)
+                    .then(function destroyTags() {
+                        return tag.destroy(options);
+                    });
             });
-        });
     }
 });
 
