@@ -1,27 +1,13 @@
 const _ = require('lodash'),
-    moment = require('moment-timezone'),
-    jsonpath = require('jsonpath'),
+    nql = require('@nexes/nql'),
     debug = require('ghost-ignition').debug('services:url:generator'),
     localUtils = require('./utils'),
-    settingsCache = require('../settings/cache'),
-    /**
-     * @TODO: This is a fake version of the upcoming GQL tool.
-     * GQL will offer a tool to match a JSON against a filter.
-     */
-    transformFilter = (filter) => {
-        filter = '$[?(' + filter + ')]';
-        filter = filter.replace(/(\w+):(\w+)/g, '@.$1 == "$2"');
-        filter = filter.replace(/"true"/g, 'true');
-        filter = filter.replace(/"false"/g, 'false');
-        filter = filter.replace(/"0"/g, '0');
-        filter = filter.replace(/"1"/g, '1');
-        filter = filter.replace(/\+/g, ' && ');
-        return filter;
-    };
+
+    aliases = {author: 'authors.slug', tags: 'tags.slug', tag: 'tags.slug', authors: 'authors.slug'};
 
 class UrlGenerator {
-    constructor(routingType, queue, resources, urls, position) {
-        this.routingType = routingType;
+    constructor(router, queue, resources, urls, position) {
+        this.router = router;
         this.queue = queue;
         this.urls = urls;
         this.resources = resources;
@@ -29,9 +15,10 @@ class UrlGenerator {
 
         debug('constructor', this.toString());
 
-        // CASE: channels can define custom filters, but not required.
-        if (this.routingType.getFilter()) {
-            this.filter = transformFilter(this.routingType.getFilter());
+        // CASE: routers can define custom filters, but not required.
+        if (this.router.getFilter()) {
+            this.filter = this.router.getFilter();
+            this.nql = nql(this.filter, {aliases});
             debug('filter', this.filter);
         }
 
@@ -43,7 +30,7 @@ class UrlGenerator {
          * @NOTE: currently only used if the permalink setting changes and it's used for this url generator.
          * @TODO: remove in Ghost 2.0
          */
-        this.routingType.addListener('updated', () => {
+        this.router.addListener('updated', () => {
             const myResources = this.urls.getByGeneratorId(this.uid);
 
             myResources.forEach((object) => {
@@ -74,7 +61,7 @@ class UrlGenerator {
         debug('_onInit', this.toString());
 
         // @NOTE: get the resources of my type e.g. posts.
-        const resources = this.resources.getAllByType(this.routingType.getType());
+        const resources = this.resources.getAllByType(this.router.getResourceType());
 
         _.each(resources, (resource) => {
             this._try(resource);
@@ -85,7 +72,7 @@ class UrlGenerator {
         debug('onAdded', this.toString());
 
         // CASE: you are type "pages", but the incoming type is "users"
-        if (event.type !== this.routingType.getType()) {
+        if (event.type !== this.router.getResourceType()) {
             return;
         }
 
@@ -119,7 +106,7 @@ class UrlGenerator {
             resource.reserve();
             this._resourceListeners(resource);
             return true;
-        } else if (jsonpath.query(resource, this.filter).length) {
+        } else if (this.nql.queryJSON(resource.data)) {
             this.urls.add({
                 url: url,
                 generatorId: this.uid,
@@ -135,65 +122,23 @@ class UrlGenerator {
     }
 
     /**
-     * We currently generate relative urls.
+     * We currently generate relative urls without subdirectory.
      */
     _generateUrl(resource) {
-        let url = this.routingType.getPermalinks().getValue();
-        url = this._replacePermalink(url, resource);
-
-        return localUtils.createUrl(url, false, false);
-    }
-
-    /**
-     * @TODO:
-     * This is a copy of `replacePermalink` of our url utility, see ./utils.
-     * But it has modifications, because the whole url utility doesn't work anymore.
-     * We will rewrite some of the functions in the utility.
-     */
-    _replacePermalink(url, resource) {
-        var output = url,
-            primaryTagFallback = 'all',
-            publishedAtMoment = moment.tz(resource.data.published_at || Date.now(), settingsCache.get('active_timezone')),
-            permalink = {
-                year: function () {
-                    return publishedAtMoment.format('YYYY');
-                },
-                month: function () {
-                    return publishedAtMoment.format('MM');
-                },
-                day: function () {
-                    return publishedAtMoment.format('DD');
-                },
-                author: function () {
-                    return resource.data.primary_author.slug;
-                },
-                primary_author: function () {
-                    return resource.data.primary_author ? resource.data.primary_author.slug : primaryTagFallback;
-                },
-                primary_tag: function () {
-                    return resource.data.primary_tag ? resource.data.primary_tag.slug : primaryTagFallback;
-                },
-                slug: function () {
-                    return resource.data.slug;
-                },
-                id: function () {
-                    return resource.data.id;
-                }
-            };
-
-        // replace tags like :slug or :year with actual values
-        output = output.replace(/(:[a-z_]+)/g, function (match) {
-            if (_.has(permalink, match.substr(1))) {
-                return permalink[match.substr(1)]();
-            }
-        });
-
-        return output;
+        const permalink = this.router.getPermalinks().getValue();
+        return localUtils.replacePermalink(permalink, resource.data);
     }
 
     /**
      * I want to know if my resources changes.
      * Register events of resource.
+     *
+     * If the owned resource get's updated, we simply release/free the resource and push it back to the queue.
+     * This is the easiest, less error prone implementation.
+     *
+     * Imagine you have two collections: `featured:true` and `page:false`.
+     * If a published post status get's featured and you have not explicitly defined `featured:false`, we wouldn't
+     * be able to figure out if this resource still belongs to me, because the filter still matches.
      */
     _resourceListeners(resource) {
         const onUpdate = (updatedResource) => {
@@ -203,25 +148,17 @@ class UrlGenerator {
             // 2. free resource, the url <-> resource connection no longer exists
             updatedResource.release();
 
-            // 3. try to own the resource again
-            // Imagine you change `featured` to true and your filter excludes featured posts.
-            const isMine = this._try(updatedResource);
+            // 3. post has the change to get owned from a different collection again
+            debug('put back in queue', updatedResource.data.id);
 
-            // 4. if the resource is no longer mine, tell the others
-            // e.g. post -> page
-            // e.g. post is featured now
-            if (!isMine) {
-                debug('free, this is not mine anymore', updatedResource.data.id);
-
-                this.queue.start({
-                    event: 'added',
-                    action: 'added:' + resource.data.id,
-                    eventData: {
-                        id: resource.data.id,
-                        type: this.routingType.getType()
-                    }
-                });
-            }
+            this.queue.start({
+                event: 'added',
+                action: 'added:' + resource.data.id,
+                eventData: {
+                    id: resource.data.id,
+                    type: this.router.getResourceType()
+                }
+            });
         };
 
         const onRemoved = (removedResource) => {
@@ -234,12 +171,22 @@ class UrlGenerator {
         resource.addListener('removed', onRemoved.bind(this));
     }
 
+    hasUrl(url) {
+        const existingUrl = this.urls.getByUrl(url);
+
+        if (existingUrl.length && existingUrl[0].generatorId === this.uid) {
+            return true;
+        }
+
+        return false;
+    }
+
     getUrls() {
         return this.urls.getByGeneratorId(this.uid);
     }
 
     toString() {
-        return this.routingType.toString();
+        return this.router.toString();
     }
 }
 

@@ -49,7 +49,7 @@ ghostBookshelf.plugin(plugins.collision);
 
 // Manages nested updates (relationships)
 ghostBookshelf.plugin('bookshelf-relations', {
-    allowedOptions: ['context', 'importing'],
+    allowedOptions: ['context', 'importing', 'migrating'],
     unsetRelations: true,
     hooks: {
         belongsToMany: {
@@ -113,6 +113,8 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
      * If the query runs in a txn, `_previousAttributes` will be empty.
      */
     emitChange: function (model, event, options) {
+        debug(model.tableName, event);
+
         const previousAttributes = model._previousAttributes;
 
         if (!options.transacting) {
@@ -122,7 +124,10 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         if (!model.ghostEvents) {
             model.ghostEvents = [];
 
-            if (options.importing) {
+            // CASE: when importing, deleting or migrating content, lot's of model queries are happening in one transaction
+            //       lot's of model events will be triggered. we ensure we set the max listeners to infinity.
+            //       we are using `once` - we auto remove the listener afterwards
+            if (options.importing || options.destroyAll || options.migrating) {
                 options.transacting.setMaxListeners(0);
             }
 
@@ -278,7 +283,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
      */
     onUpdating: function onUpdating(newObj, attr, options) {
         if (schema.tables[this.tableName].hasOwnProperty('updated_by')) {
-            if (!options.importing) {
+            if (!options.importing && !options.migrating) {
                 this.set('updated_by', this.contextUser(options));
             }
         }
@@ -299,7 +304,9 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
 
         // CASE: do not allow setting only the `updated_at` field, exception: importing
         if (schema.tables[this.tableName].hasOwnProperty('updated_at') && !options.importing) {
-            if (newObj.hasChanged() && Object.keys(newObj.changed).length === 1 && newObj.changed.updated_at) {
+            if (options.migrating) {
+                newObj.set('updated_at', newObj.previous('updated_at'));
+            } else if (newObj.hasChanged() && Object.keys(newObj.changed).length === 1 && newObj.changed.updated_at) {
                 newObj.set('updated_at', newObj.previous('updated_at'));
             }
         }
@@ -496,7 +503,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         }
 
         // terms to whitelist for all methods.
-        return ['context', 'withRelated', 'transacting', 'importing', 'forUpdate'];
+        return ['context', 'withRelated', 'transacting', 'importing', 'forUpdate', 'migrating'];
     },
 
     /**
@@ -996,44 +1003,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
                 User: 'users',
                 Tag: 'tags'
             };
-            const reducedFields = options.reducedFields;
-            const exclude = {
-                Post: [
-                    'title',
-                    'mobiledoc',
-                    'html',
-                    'plaintext',
-                    'amp',
-                    'codeinjection_head',
-                    'codeinjection_foot',
-                    'meta_title',
-                    'meta_description',
-                    'custom_excerpt',
-                    'og_image',
-                    'og_title',
-                    'og_description',
-                    'twitter_image',
-                    'twitter_title',
-                    'twitter_description',
-                    'custom_template'
-                ],
-                User: [
-                    'bio',
-                    'website',
-                    'location',
-                    'facebook',
-                    'twitter',
-                    'accessibility',
-                    'meta_title',
-                    'meta_description',
-                    'tour'
-                ],
-                Tag: [
-                    'description',
-                    'meta_title',
-                    'meta_description'
-                ]
-            };
+            const exclude = options.exclude;
             const filter = options.filter;
             const withRelated = options.withRelated;
             const withRelatedFields = options.withRelatedFields;
@@ -1045,7 +1015,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
                         relation: 'posts_tags',
                         condition: ['posts_tags.tag_id', '=', 'tags.id']
                     },
-                    select: ['posts_tags.post_id as post_id'],
+                    select: ['posts_tags.post_id as post_id', 'tags.visibility'],
                     whereIn: 'posts_tags.post_id',
                     whereInKey: 'post_id',
                     orderBy: 'sort_order'
@@ -1066,11 +1036,19 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
 
             let query = ghostBookshelf.knex(tableNames[modelName]);
 
+            if (options.offset) {
+                query.offset(options.offset);
+            }
+
+            if (options.limit) {
+                query.limit(options.limit);
+            }
+
             // exclude fields if enabled
-            if (reducedFields) {
+            if (exclude) {
                 const toSelect = _.keys(schema.tables[tableNames[modelName]]);
 
-                _.each(exclude[modelName], (key) => {
+                _.each(exclude, (key) => {
                     if (toSelect.indexOf(key) !== -1) {
                         toSelect.splice(toSelect.indexOf(key), 1);
                     }
@@ -1084,6 +1062,11 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
 
             return query.then((objects) => {
                 debug('fetched', modelName, filter);
+
+                if (!objects.length) {
+                    debug('No more entries found');
+                    return Promise.resolve([]);
+                }
 
                 let props = {};
 

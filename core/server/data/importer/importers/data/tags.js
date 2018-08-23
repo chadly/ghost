@@ -10,11 +10,6 @@ class TagsImporter extends BaseImporter {
             modelName: 'Tag',
             dataKeyToImport: 'tags'
         });
-
-        // Map legacy keys
-        this.legacyKeys = {
-            image: 'feature_image'
-        };
     }
 
     fetchExisting(modelOptions) {
@@ -43,8 +38,6 @@ class TagsImporter extends BaseImporter {
 
         let ops = [];
 
-        this.dataToImport = this.dataToImport.map(this.legacyMapper);
-
         _.each(this.dataToImport, (obj) => {
             ops.push(models[this.modelName].findOne({name: obj.name}, options)
                 .then((tag) => {
@@ -65,7 +58,8 @@ class TagsImporter extends BaseImporter {
                             // for identifier lookup
                             this.importedData.push({
                                 id: importedModel.id,
-                                slug: importedModel.get('slug')
+                                slug: importedModel.get('slug'),
+                                originalSlug: obj.slug
                             });
 
                             return importedModel;
