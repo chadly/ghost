@@ -11,12 +11,11 @@ routes:
 
 collections:
   /:
-    route: '{globals.permalinks}'
+    permalink: '/{slug}/'
     template:
-      - home
       - index
 
-resources:
+taxonomies:
   tag: /tag/{slug}/
   author: /author/{slug}/
 ```

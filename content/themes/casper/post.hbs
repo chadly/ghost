@@ -33,7 +33,9 @@ into the {body} of the default.hbs template --}}
             {{/if}}
 
             <section class="post-full-content">
-                {{content}}
+                <div class="post-content">
+                    {{content}}
+                </div>
             </section>
 
             {{!-- Email subscribe form at the bottom of the page --}}
@@ -141,7 +143,7 @@ $(document).ready(function () {
     $postContent.fitVids();
     // End fitVids
 
-    var progressBar = document.querySelector('progress');
+    var progressBar = document.querySelector('#reading-progress');
     var header = document.querySelector('.floating-header');
     var title = document.querySelector('.post-full-title');
 

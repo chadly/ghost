@@ -1,4 +1,4 @@
-var express = require('express'),
+const express = require('express'),
     // This essentially provides the controllers for the routes
     api = require('../../api'),
 
@@ -21,7 +21,7 @@ var express = require('express'),
 
 // @TODO refactor/clean this up - how do we want the routing to work long term?
 module.exports = function apiRoutes() {
-    var apiRouter = express.Router();
+    const apiRouter = express.Router();
 
     // alias delete with del
     apiRouter.del = apiRouter.delete;
@@ -49,6 +49,14 @@ module.exports = function apiRoutes() {
     ], api.http(api.schedules.publishPost));
 
     // ## Settings
+    apiRouter.get('/settings/routes/yaml', mw.authenticatePrivate, api.http(api.settings.download));
+    apiRouter.post('/settings/routes/yaml',
+        mw.authenticatePrivate,
+        upload.single('routes'),
+        validation.upload({type: 'routes'}),
+        api.http(api.settings.upload)
+    );
+
     apiRouter.get('/settings', mw.authenticatePrivate, api.http(api.settings.browse));
     apiRouter.get('/settings/:key', mw.authenticatePrivate, api.http(api.settings.read));
     apiRouter.put('/settings', mw.authenticatePrivate, api.http(api.settings.edit));
@@ -205,6 +213,9 @@ module.exports = function apiRoutes() {
     // ## Webhooks (RESTHooks)
     apiRouter.post('/webhooks', mw.authenticatePrivate, api.http(api.webhooks.add));
     apiRouter.del('/webhooks/:id', mw.authenticatePrivate, api.http(api.webhooks.destroy));
+
+    // ## Oembed (fetch response from oembed provider)
+    apiRouter.get('/oembed', mw.authenticatePrivate, api.http(api.oembed.read));
 
     return apiRouter;
 };
