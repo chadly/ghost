@@ -36,7 +36,9 @@ _private.loadNconf = function loadNconf(options) {
     nconf.file('defaults', path.join(baseConfigPath, 'defaults.json'));
 
     // set settings manually from azure app service
-    nconf.set('server:port', process.env.PORT);
+    if (process.env.PORT) {
+        nconf.set('server:port', process.env.PORT);
+    }
 
     /**
      * transform all relative paths to absolute paths
