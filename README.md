@@ -34,6 +34,6 @@ INFO Ctrl+C to shut down
 INFO Ghost boot 3.455s
 ```
 
-Open the configured URL in your web browser and you should see the default Ghost installation. Navigate to `/ghost` to setup the blog.
+Open the configured URL in your web browser and you should see the default Ghost installation. Navigate to `/ghost` to setup the site.
 
 Head on over to the [Ghost Development Documentation](https://ghost.org/developers/) for more information on how to setup and develop with Ghost.
