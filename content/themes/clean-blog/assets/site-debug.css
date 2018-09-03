@@ -7142,15 +7142,6 @@ footer.site a {
   margin-left: -50vw;
   margin-right: -50vw;
 }
-.post-template main article figure,
-.page-template main article figure {
-  margin: 3em 0;
-  text-align: center;
-}
-.post-template main article figcaption,
-.page-template main article figcaption {
-  text-align: center;
-}
 .post-template main article footer,
 .page-template main article footer {
   margin: 2rem 0;
@@ -7173,6 +7164,13 @@ footer.site a {
 .page-template main article footer section.share a.social-link svg {
   height: 25px;
   fill: #337ab7;
+}
+figure {
+  margin: 3em 0;
+  text-align: center;
+}
+figcaption {
+  text-align: center;
 }
 .author-profile-image {
   box-shadow: 0 0 0 6px hsla(0, 0%, 100%, 0.1);

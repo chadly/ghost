@@ -12,6 +12,17 @@
     "theme",
     "ghost-theme"
   ],
+  "gpm": {
+    "type": "theme",
+    "categories": [
+        "Minimal",
+        "Personal Blogs"
+    ]
+  },
+  "screenshots": {
+    "desktop": "assets/screenshot-desktop.png",
+    "mobile": "assets/screenshot-mobile.png"
+  },
   "license": "MIT",
   "scripts": {
     "dist": "rimraf dist && copyfiles *.hbs assets/**/* partials/**/* package.json dist",
