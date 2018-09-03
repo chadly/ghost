@@ -1,0 +1,26 @@
+{{!< default}}
+
+{{#tag}}
+<header class="site {{#if cover_image}}" style="background-image: url({{cover_image}}){{else}}no-cover{{/if}}">
+	<div class="container">
+		<section>
+			<h1>{{name}}</h1>
+			<h2>
+				{{#if description}}
+					{{description}}
+				{{else}}
+					A collection of {{plural ../pagination.total empty='posts' singular='% post' plural='% posts'}}
+				{{/if}}
+			</h2>
+		</section>
+	</div>
+</header>
+{{/tag}}
+
+<main class="site" role="main">
+	<section class="post-list" itemScope itemType="http://schema.org/Blog">
+		{{#foreach posts}}
+			{{> "post-stub"}}
+		{{/foreach}}
+	</section>
+</main>

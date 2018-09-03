@@ -1,0 +1,12 @@
+<article class="post-stub" itemProp="blogPost" itemScope itemType="http://schema.org/BlogPosting">
+	<time datetime="{{date format="YYYY-MM-DD"}}" itemProp="datePublished">{{date format="DD MMM YYYY"}}</time>
+	<header>
+		<a href="{{url}}" itemProp="name headline url" class="post-title">{{title}}</a>
+	</header>
+
+	<footer>
+		<span class="reading-time">{{reading_time}}</span>
+		{{> "author-list"}}
+		{{> "post-tags"}}
+	</footer>
+</article>

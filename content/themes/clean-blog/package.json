@@ -1,0 +1,42 @@
+{
+  "name": "clean-blog",
+  "private": true,
+  "version": "1.0.0",
+  "author": {
+    "name": "Chad Lee",
+    "email": "ghost@chadly.net",
+    "url": "https://www.chadly.net/"
+  },
+  "keywords": [
+    "ghost",
+    "theme",
+    "ghost-theme"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "dist": "rimraf dist && copyfiles *.hbs assets/**/* partials/**/* package.json dist",
+    "copy-vendor-scripts": "copyfiles -f node_modules/fitvids/dist/fitvids.min.js assets",
+    "compile": "lessc assets/index.less assets/site-debug.css && csso assets/site-debug.css assets/site.css",
+    "build": "yarn run compile && yarn run dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chadly/clean-blog.git"
+  },
+  "dependencies": {
+    "fitvids": "^2.0.0"
+  },
+  "devDependencies": {
+    "bootstrap": "^3.3.7",
+    "copyfiles": "^2.0.0",
+    "csso-cli": "^1.1.0",
+    "less": "^3.8.1",
+    "rimraf": "^2.6.2"
+  },
+  "config": {
+    "posts_per_page": 1000
+  },
+  "engines": {
+    "ghost": ">=2.0.0"
+  }
+}

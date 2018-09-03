@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>{{meta_title}}</title>
+	<meta name="HandheldFriendly" content="True" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="stylesheet" type="text/css" href="{{asset "site.css"}}" />
+</head>
+<body class="error-template">
+	<div id="wrap">
+
+		<header class="site no-cover">
+			<div class="container">
+				{{#if @blog.logo}}
+					<a class="site-nav-logo" href="{{@blog.url}}"><img src="{{@blog.logo}}" class="site-logo" alt="{{@blog.title}}" /></a>
+				{{else}}
+					<a class="site-nav-logo" href="{{@blog.url}}">{{@blog.title}}</a>
+				{{/if}}
+			</div>
+		</header>
+
+		<main class="site" role="main">
+			<img src="{{asset "oatmeal-tumbeast-404.png"}}" class="error-image" alt="404 Page Not Found" title="404 Page Not Found" />
+			<p><a class="error-link" href="{{@blog.url}}">Go to the front page →</a></p>
+		</main>
+	</div>
+</body>
+</html>

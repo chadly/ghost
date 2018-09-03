@@ -1,0 +1,24 @@
+{{!< default}}
+
+<header class="site {{#if @blog.cover_image}}" style="background-image: url({{@blog.cover_image}}){{else}}no-cover{{/if}}">
+	<div class="container">
+		<section>
+			<h1>
+				{{#if @blog.logo}}
+					<img class="site-logo" src="{{@blog.logo}}" alt="{{@blog.title}}" />
+				{{else}}
+					{{@blog.title}}
+				{{/if}}
+			</h1>
+			<h2>{{@blog.description}}</h2>
+		</section>
+	</div>
+</header>
+
+<main class="site" role="main">
+	<section class="post-list" itemScope itemType="http://schema.org/Blog">
+		{{#foreach posts}}
+			{{> "post-stub"}}
+		{{/foreach}}
+	</section>
+</main>
