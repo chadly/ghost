@@ -99,9 +99,10 @@ call :SelectNodeVersion
 
 :: 3. Install Yarn
 echo Verifying Yarn Install.
-call :ExecuteCmd !NPM_CMD! config set prefix "D:\home\tools"
 call :ExecuteCmd !NPM_CMD! install yarn -g
-set path=%path%;D:\home\tools
+FOR /F "tokens=* USEBACKQ" %%F IN (`npm config get prefix`) DO (
+SET "PATH=%PATH%;%%F"
+)
 
 :: 4. Install Yarn packages
 echo Installing Yarn Packages.
