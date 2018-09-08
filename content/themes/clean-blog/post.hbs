@@ -10,7 +10,6 @@
 				<time datetime="{{date format="YYYY-MM-DD"}}" itemProp="datePublished">
 					Published on {{date format="MMMM DD, YYYY"}}
 				</time>
-				{{> "author-list"}}
 				{{> "post-tags"}}
 				<span class="reading-time">{{reading_time}}</span>
 			</div>
@@ -33,11 +32,21 @@
 			</section>
 		</footer>
 
-		{{!--
 		<div class="post-comments">
-			If you want to embed comments, this is a good place to do it!
+			<div id="disqus_thread"></div>
+			<script>
+				var disqus_config = function () {
+					this.page.url = '{{url absolute="true"}}';
+					this.page.identifier = 'ghost-{{comment_id}}';
+				};
+				(function() {
+					var d = document, s = d.createElement('script');
+					s.src = 'https://chadlynet.disqus.com/embed.js';
+					s.setAttribute('data-timestamp', +new Date());
+					(d.head || d.body).appendChild(s);
+				})();
+			</script>
 		</div>
-		--}}
 	</article>
 </main>
 

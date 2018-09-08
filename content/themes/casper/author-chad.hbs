@@ -1,0 +1,78 @@
+{{!< default}}
+{{!-- The tag above means - insert everything in this file into the {body} of the default.hbs template --}}
+
+{{#author}}
+{{!-- Everything inside the #author tags pulls data from the author --}}
+<header class="site-header outer {{#if cover_image}}" style="background-image: url({{cover_image}}){{else}}no-cover{{/if}}">
+    <div class="inner">
+        {{> "site-nav"}}
+        <div class="site-header-content">
+            {{#if profile_image}}
+                <img class="author-profile-image" src="{{profile_image}}" alt="{{name}}" />
+            {{/if}}
+            <h1 class="site-title">{{name}}</h1>
+            {{#if bio}}
+                <h2 class="author-bio">{{bio}}</h2>
+            {{/if}}
+            <div class="author-meta">
+                {{#if location}}
+                    <div class="author-location">{{location}} <span class="bull">&bull;</span></div>
+                {{/if}}
+                <div class="author-stats">
+                    {{plural ../pagination.total empty='No posts' singular='% post' plural='% posts'}} <span class="bull">&bull;</span>
+                </div>
+                {{#if website}}
+                    <a class="social-link social-link-wb" href="{{website}}" target="_blank" rel="noopener">{{> "icons/website"}}</a>
+                {{/if}}
+                {{#if twitter}}
+                    <a class="social-link social-link-tw" href="{{twitter_url}}" target="_blank" rel="noopener">{{> "icons/twitter"}}</a>
+                {{/if}}
+                {{#if facebook}}
+                    <a class="social-link social-link-fb" href="{{facebook_url}}" target="_blank" rel="noopener">{{> "icons/facebook"}}</a>
+                {{/if}}
+                <a class="social-link social-link-rss" href="https://feedly.com/i/subscription/feed/{{url absolute="true"}}rss/" target="_blank" rel="noopener">{{> "icons/rss"}}</a>
+            </div>
+        </div>
+    </div>
+</header>
+{{/author}}
+
+{{!-- The main content area --}}
+<main id="site-main" class="site-main outer">
+    <div class="inner">
+        <div id="game-container">
+            <canvas id="canvas" width="780" height="540"></canvas>
+            <div id="left-controls">
+                <div id="up" class='button'>THRUST</div>
+                <div id="left" class='button'>LEFT</div>
+                <div id="right" class='button'>RIGHT</div>
+            </div>
+            <div id="right-controls">
+                <div id="space" class='button'>FIRE</div>
+            </div>
+        </div>
+
+        <p>
+            <a href="https://github.com/dmcinnes/HTML5-Asteroids">Thanks to Doug McInnes</a>
+        </p>
+    </div>
+</main>
+
+<style>
+    #canvas { border:1px solid black; margin: 25px auto; }
+    .button { position:absolute; border:1px solid black; }
+    #left-controls { position:absolute; left:1px; bottom:0px; display:none; }
+    #right-controls { position:absolute; right:1px; bottom:0px; display:none; }
+    #up { width:200px; height:100px; bottom:100px;}
+    #left { width:100px; height:100px; bottom:0px;}
+    #right { width:100px; height:100px; bottom:0px; left:100px; }
+    #space { width:200px; height:200px; bottom:0px; right:0px; }
+</style>
+
+<script src="/asteroids/jquery-1.4.1.min.js"></script>
+<script type="text/javascript">
+    var jq = $.noConflict(true);
+</script>
+<script src="/asteroids/vector_battle_regular.typeface.js"></script>
+<script src="/asteroids/ipad.js"></script>
+<script src="/asteroids/game.js"></script>
