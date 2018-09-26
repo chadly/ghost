@@ -6906,9 +6906,6 @@ header.site {
   -o-background-size: cover;
   margin-bottom: 50px;
 }
-header.site.no-cover {
-  background-color: black;
-}
 header.site section {
   padding: 150px 0;
 }
@@ -6916,6 +6913,17 @@ header.site section {
   header.site section {
     padding: 75px 0;
   }
+}
+header.site.no-cover {
+  background: #141E30;
+  /* fallback for old browsers */
+  background: -webkit-linear-gradient(to bottom, #243B55, #141E30);
+  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom, #243B55, #141E30);
+  /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
+header.site.no-cover section {
+  padding: 25px 0;
 }
 header.site h1,
 header.site h2,
@@ -6993,6 +7001,9 @@ header.site .author-profile-image {
 .home-template .navbar-brand {
   display: none;
 }
+.error-template header.site {
+  color: #f8f8f9;
+}
 .error-template header.site .container,
 .error-template header.site main.site,
 .error-template header.site footer.site section {
@@ -7001,6 +7012,10 @@ header.site .author-profile-image {
 .error-template header.site .site-logo {
   max-height: 30px;
   margin: 10px;
+}
+.error-template header.site a {
+  color: #f8f8f9;
+  text-decoration: none;
 }
 .error-template main.site {
   text-align: center;
@@ -7120,6 +7135,7 @@ footer.site a {
 .page-template main article img {
   display: block;
   max-width: 100%;
+  margin: 10px auto;
 }
 .post-template main article .kg-image-card img,
 .page-template main article .kg-image-card img {
@@ -7177,4 +7193,14 @@ figcaption {
   background: #e3e9ed;
   border-radius: 100%;
   object-fit: cover;
+}
+.alert .fa {
+  display: table-cell;
+  padding: 0 0.5em 0 0.2em;
+  opacity: 0.2;
+  font-size: 1.5em;
+  vertical-align: middle;
+}
+.alert p {
+  display: table-cell;
 }

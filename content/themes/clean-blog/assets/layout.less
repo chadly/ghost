@@ -23,15 +23,22 @@ header.site {
 	background-attachment: scroll;
 	.background-cover; //NOTE: Background images are set within the HTML using inline CSS!
 
-	&.no-cover {
-		background-color: black;
-	}
-
 	section {
 		padding: 150px 0;
 
 		@media only screen and (max-width: @screen-sm-min) {
 			padding: 75px 0;
+		}
+	}
+
+	&.no-cover {
+		// https://uigradients.com/#Royal
+		background: #141E30;  /* fallback for old browsers */
+		background: -webkit-linear-gradient(to bottom, #243B55, #141E30);  /* Chrome 10-25, Safari 5.1-6 */
+		background: linear-gradient(to bottom, #243B55, #141E30); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+
+		section {
+			padding: 25px 0;
 		}
 	}
 
@@ -126,6 +133,13 @@ header.site {
 		.site-logo {
 			max-height: 30px;
 			margin: 10px;
+		}
+
+		color: #f8f8f9;
+
+		a {
+			color: #f8f8f9;
+			text-decoration: none;
 		}
 	}
 
