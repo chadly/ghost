@@ -6,9 +6,37 @@ const moment = require('moment-timezone'),
     cheerio = require('cheerio'),
     config = require('../../config'),
     settingsCache = require('../settings/cache'),
-    // @TODO: unify this with the path in server/app.js
-    API_PATH = '/ghost/api/v0.1/',
+    BASE_API_PATH = '/ghost/api',
     STATIC_IMAGE_URL_PREFIX = 'content/images';
+
+/**
+ * Returns API path combining base path and path for specific version asked or deprecated by default
+ * @param {Object} options {version} for which to get the path(stable, actice, deprecated),
+ * {type} admin|content: defaults to {version: deprecated, type: content}
+ * @return {string} API Path for version
+ */
+function getApiPath(options) {
+    const versionPath = getVersionPath(options);
+    return `${BASE_API_PATH}${versionPath}`;
+}
+
+/**
+ * Returns path containing only the path for the specific version asked or deprecated by default
+ * @param {Object} options {version} for which to get the path(stable, actice, deprecated),
+ * {type} admin|content: defaults to {version: deprecated, type: content}
+ * @return {string} API version path
+ */
+function getVersionPath(options) {
+    const apiVersions = config.get('api:versions');
+    let requestedVersion = options.version || 'v0.1';
+    let requestedVersionType = options.type || 'content';
+    let versionData = apiVersions[requestedVersion];
+    if (typeof versionData === 'string') {
+        versionData = apiVersions[versionData];
+    }
+    let versionPath = versionData[requestedVersionType];
+    return `/${versionPath}/`;
+}
 
 /**
  * Returns the base URL of the blog as set in the config.
@@ -65,7 +93,7 @@ function deduplicateSubDir(url) {
     subDir = subDir.replace(/^\/|\/+$/, '');
     // we can have subdirs that match TLDs so we need to restrict matches to
     // duplicates that start with a / or the beginning of the url
-    subDirRegex = new RegExp('(^|\/)' + subDir + '\/' + subDir + '\/');
+    subDirRegex = new RegExp('(^|/)' + subDir + '/' + subDir + '/');
 
     return url.replace(subDirRegex, '$1' + subDir + '/');
 }
@@ -238,7 +266,6 @@ function urlFor(context, data, absolute) {
         // this will become really big
         knownPaths = {
             home: '/',
-            api: API_PATH,
             sitemap_xsl: '/sitemap.xsl'
         };
 
@@ -289,7 +316,7 @@ function urlFor(context, data, absolute) {
         urlPath = getBlogUrl(secure);
 
         // CASE: there are cases where urlFor('home') needs to be returned without trailing
-        // slash e. g. the `{{@blog.url}}` helper. See https://github.com/TryGhost/Ghost/issues/8569
+        // slash e. g. the `{{@site.url}}` helper. See https://github.com/TryGhost/Ghost/issues/8569
         if (data && data.trailingSlash === false) {
             urlPath = urlPath.replace(/\/$/, '');
         }
@@ -303,7 +330,7 @@ function urlFor(context, data, absolute) {
         }
     } else if (context === 'api') {
         urlPath = getAdminUrl() || getBlogUrl();
-
+        let apiPath = getApiPath({version: 'v0.1', type: 'content'});
         // CASE: with or without protocol? If your blog url (or admin url) is configured to http, it's still possible that e.g. nginx allows both https+http.
         // So it depends how you serve your blog. The main focus here is to avoid cors problems.
         // @TODO: rename cors
@@ -313,10 +340,14 @@ function urlFor(context, data, absolute) {
             }
         }
 
+        if (data && data.version) {
+            apiPath = getApiPath({version: data.version, type: data.versionType});
+        }
+
         if (absolute) {
-            urlPath = urlPath.replace(/\/$/, '') + API_PATH;
+            urlPath = urlPath.replace(/\/$/, '') + apiPath;
         } else {
-            urlPath = API_PATH;
+            urlPath = apiPath;
         }
     } else if (_.isString(context) && _.indexOf(_.keys(knownPaths), context) !== -1) {
         // trying to create a url for a named path
@@ -325,7 +356,7 @@ function urlFor(context, data, absolute) {
 
     // This url already has a protocol so is likely an external url to be returned
     // or it is an alternative scheme, protocol-less, or an anchor-only path
-    if (urlPath && (urlPath.indexOf('://') !== -1 || urlPath.match(/^(\/\/|#|[a-zA-Z0-9\-]+:)/))) {
+    if (urlPath && (urlPath.indexOf('://') !== -1 || urlPath.match(/^(\/\/|#|[a-zA-Z0-9-]+:)/))) {
         return urlPath;
     }
 
@@ -361,23 +392,20 @@ function redirectToAdmin(status, res, adminPath) {
  * absolute urls. Returns an object. The html string can be accessed by calling `html()` on
  * the variable that takes the result of this function
  */
-function makeAbsoluteUrls(html, siteUrl, itemUrl) {
-    var htmlContent = cheerio.load(html, {decodeEntities: false});
+function makeAbsoluteUrls(html, siteUrl, itemUrl, options = {assetsOnly: false}) {
+    const htmlContent = cheerio.load(html, {decodeEntities: false});
+    const staticImageUrlPrefixRegex = new RegExp(STATIC_IMAGE_URL_PREFIX);
 
     // convert relative resource urls to absolute
     ['href', 'src'].forEach(function forEach(attributeName) {
         htmlContent('[' + attributeName + ']').each(function each(ix, el) {
-            var baseUrl,
-                attributeValue,
-                parsed;
-
             el = htmlContent(el);
 
-            attributeValue = el.attr(attributeName);
+            let attributeValue = el.attr(attributeName);
 
             // if URL is absolute move on to the next element
             try {
-                parsed = url.parse(attributeValue);
+                const parsed = url.parse(attributeValue);
 
                 if (parsed.protocol) {
                     return;
@@ -395,11 +423,15 @@ function makeAbsoluteUrls(html, siteUrl, itemUrl) {
             if (attributeValue[0] === '#') {
                 return;
             }
-            // compose an absolute URL
 
+            if (options.assetsOnly && !attributeValue.match(staticImageUrlPrefixRegex)) {
+                return;
+            }
+
+            // compose an absolute URL
             // if the relative URL begins with a '/' use the blog URL (including sub-directory)
             // as the base URL, otherwise use the post's URL.
-            baseUrl = attributeValue[0] === '/' ? siteUrl : itemUrl;
+            const baseUrl = attributeValue[0] === '/' ? siteUrl : itemUrl;
             attributeValue = urlJoin(baseUrl, attributeValue);
             el.attr(attributeName, attributeValue);
         });
@@ -444,6 +476,9 @@ module.exports.redirectToAdmin = redirectToAdmin;
 module.exports.redirect301 = redirect301;
 module.exports.createUrl = createUrl;
 module.exports.deduplicateDoubleSlashes = deduplicateDoubleSlashes;
+module.exports.getApiPath = getApiPath;
+module.exports.getVersionPath = getVersionPath;
+module.exports.getBlogUrl = getBlogUrl;
 
 /**
  * If you request **any** image in Ghost, it get's served via

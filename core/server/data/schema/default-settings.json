@@ -8,6 +8,9 @@
         },
         "notifications": {
             "defaultValue": "[]"
+        },
+        "session_secret": {
+            "defaultValue": null
         }
     },
     "blog": {
@@ -28,10 +31,10 @@
             }
         },
         "logo": {
-            "defaultValue": "https://casper.ghost.org/v1.0.0/images/ghost-logo.svg"
+            "defaultValue": "https://static.ghost.org/v1.0.0/images/ghost-logo.svg"
         },
         "cover_image": {
-            "defaultValue": "https://casper.ghost.org/v1.0.0/images/blog-cover.jpg"
+            "defaultValue": "https://static.ghost.org/v1.0.0/images/blog-cover.jpg"
         },
         "icon": {
             "defaultValue": ""
@@ -80,13 +83,13 @@
             "defaultValue" : "tryghost"
         },
         "labs": {
-            "defaultValue": "{\"publicAPI\": true}"
+            "defaultValue": "{}"
         },
         "navigation": {
-            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://help.ghost.org\"}]"
+            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://docs.ghost.org\"}]"
         },
         "slack": {
-            "defaultValue": "[{\"url\":\"\"}]"
+            "defaultValue": "[{\"url\":\"\", \"username\":\"Ghost\"}]"
         },
         "unsplash": {
             "defaultValue": "{\"isActive\": true}"
@@ -114,6 +117,20 @@
         },
         "public_hash": {
             "defaultValue": null
+        }
+    },
+    "members": {
+        "members_public_key": {
+            "defaultValue": null
+        },
+        "members_private_key": {
+            "defaultValue": null
+        },
+        "members_session_secret": {
+            "defaultValue": null
+        },
+        "members_subscription_settings": {
+            "defaultValue": "{\"isPaid\":false,\"paymentProcessors\":[{\"adapter\":\"stripe\",\"config\":{\"secret_token\":\"\",\"public_token\":\"\",\"product\":{\"name\":\"Ghost Subscription\"},\"plans\":[{\"name\":\"Monthly\",\"currency\":\"usd\",\"interval\":\"month\",\"amount\":\"\"},{\"name\":\"Yearly\",\"currency\":\"usd\",\"interval\":\"year\",\"amount\":\"\"}]}}]}"
         }
     }
 }

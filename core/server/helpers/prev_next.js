@@ -49,10 +49,14 @@ buildApiOptions = function buildApiOptions(options, post) {
 };
 
 fetch = function fetch(options, data) {
-    var self = this,
-        apiOptions = buildApiOptions(options, this);
+    const self = this;
+    const apiOptions = buildApiOptions(options, this);
+    const apiVersion = data.root._locals.apiVersion;
 
-    return api.posts
+    // @TODO: https://github.com/TryGhost/Ghost/issues/10548
+    const controller = api[apiVersion].postsPublic || api[apiVersion].posts;
+
+    return controller
         .browse(apiOptions)
         .then(function handleSuccess(result) {
             var related = result.posts[0];
@@ -76,7 +80,8 @@ fetch = function fetch(options, data) {
 module.exports = function prevNext(options) {
     options = options || {};
 
-    var data = createFrame(options.data);
+    const data = createFrame(options.data);
+    const context = options.data.root.context;
 
     // Guard against incorrect usage of the helpers
     if (!options.fn || !options.inverse) {
@@ -85,8 +90,12 @@ module.exports = function prevNext(options) {
         return Promise.resolve();
     }
 
-    // Guard against trying to execute prev/next on previews, pages, or other resources
-    if (!isPost(this) || this.status !== 'published' || this.page) {
+    if (context.includes('preview')) {
+        return Promise.resolve(options.inverse(this, {data: data}));
+    }
+
+    // Guard against trying to execute prev/next on pages, or other resources
+    if (!isPost(this) || this.page) {
         return Promise.resolve(options.inverse(this, {data: data}));
     }
 

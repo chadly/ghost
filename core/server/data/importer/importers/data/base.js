@@ -189,6 +189,11 @@ class Base {
 
             // CASE: you import null, fallback to owner
             if (!obj[key]) {
+                // Exception: If the imported post is a draft published_by will be null. Not a userReferenceProblem.
+                if (key === 'published_by' && obj.status === 'draft') {
+                    return;
+                }
+
                 if (!userReferenceProblems[obj.id]) {
                     userReferenceProblems[obj.id] = {obj: _.cloneDeep(obj), keys: []};
                 }
@@ -267,6 +272,9 @@ class Base {
             }
         };
 
+        /**
+         * @deprecated: x_by fields (https://github.com/TryGhost/Ghost/issues/10286)
+         */
         // Iterate over all possible user relations
         _.each(this.dataToImport, (obj) => {
             _.each([

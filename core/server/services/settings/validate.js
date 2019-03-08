@@ -1,7 +1,9 @@
 const _ = require('lodash');
+const debug = require('ghost-ignition').debug('services:settings:validate');
 const common = require('../../lib/common');
-const RESOURCE_CONFIG = require('../../services/routing/assets/resource-config');
+const themeService = require('../../services/themes');
 const _private = {};
+let RESOURCE_CONFIG;
 
 _private.validateTemplate = function validateTemplate(object) {
     // CASE: /about/: about
@@ -48,7 +50,6 @@ _private.validateData = function validateData(object) {
 
         let [resourceKey, slug] = shortForm.split('.');
 
-        // @NOTE: `data: author.foo` is not allowed currently, because this will make {{author}} available in the theme, which is deprecated (single author usage)
         if (!RESOURCE_CONFIG.QUERY[resourceKey] ||
             (RESOURCE_CONFIG.QUERY[resourceKey].hasOwnProperty('internal') && RESOURCE_CONFIG.QUERY[resourceKey].internal === true)) {
             throw new common.errors.ValidationError({
@@ -58,11 +59,14 @@ _private.validateData = function validateData(object) {
         }
 
         longForm.query[options.resourceKey || resourceKey] = {};
-        longForm.query[options.resourceKey || resourceKey] = _.omit(_.cloneDeep(RESOURCE_CONFIG.QUERY[resourceKey]), 'alias');
+        longForm.query[options.resourceKey || resourceKey] = _.cloneDeep(_.omit(RESOURCE_CONFIG.QUERY[resourceKey], 'resourceAlias'));
 
         // redirect is enabled by default when using the short form
         longForm.router = {
-            [RESOURCE_CONFIG.QUERY[resourceKey].alias]: [{slug: slug, redirect: true}]
+            [RESOURCE_CONFIG.QUERY[resourceKey].resourceAlias || RESOURCE_CONFIG.QUERY[resourceKey].resource]: [{
+                slug: slug,
+                redirect: true
+            }]
         };
 
         longForm.query[options.resourceKey || resourceKey].options.slug = slug;
@@ -78,7 +82,7 @@ _private.validateData = function validateData(object) {
             type: ['read', 'browse'],
             resource: _.map(RESOURCE_CONFIG.QUERY, 'resource')
         };
-        const allowedQueryOptions = ['limit', 'filter', 'include', 'slug', 'visibility', 'status'];
+        const allowedQueryOptions = ['limit', 'order', 'filter', 'include', 'slug', 'visibility', 'status', 'page'];
         const allowedRouterOptions = ['redirect', 'slug'];
         const defaultRouterOptions = {
             redirect: true
@@ -147,24 +151,28 @@ _private.validateData = function validateData(object) {
                 data.query[key][option] = object.data[key][option];
             });
 
-            const DEFAULT_RESOURCE =  _.find(RESOURCE_CONFIG.QUERY, {resource: data.query[key].resource});
+            const DEFAULT_RESOURCE = _.find(RESOURCE_CONFIG.QUERY, {resource: data.query[key].resource});
+
+            data.query[key].resource = DEFAULT_RESOURCE.resource;
+
+            data.query[key] = _.defaults(data.query[key], _.omit(DEFAULT_RESOURCE, ['options', 'resourceAlias']));
 
             data.query[key].options = _.pick(object.data[key], allowedQueryOptions);
             if (data.query[key].type === 'read') {
                 data.query[key].options = _.defaults(data.query[key].options, DEFAULT_RESOURCE.options);
             }
 
-            if (!data.router.hasOwnProperty(DEFAULT_RESOURCE.alias)) {
-                data.router[DEFAULT_RESOURCE.alias] = [];
+            if (!data.router.hasOwnProperty(DEFAULT_RESOURCE.resourceAlias || DEFAULT_RESOURCE.resource)) {
+                data.router[DEFAULT_RESOURCE.resourceAlias || DEFAULT_RESOURCE.resource] = [];
             }
 
             // CASE: we do not allowed redirects for type browse
             if (data.query[key].type === 'read') {
                 let entry = _.pick(object.data[key], allowedRouterOptions);
                 entry = _.defaults(entry, defaultRouterOptions);
-                data.router[DEFAULT_RESOURCE.alias].push(entry);
+                data.router[DEFAULT_RESOURCE.resourceAlias || DEFAULT_RESOURCE.resource].push(entry);
             } else {
-                data.router[DEFAULT_RESOURCE.alias].push(defaultRouterOptions);
+                data.router[DEFAULT_RESOURCE.resourceAlias || DEFAULT_RESOURCE.resource].push(defaultRouterOptions);
             }
         });
 
@@ -279,7 +287,7 @@ _private.validateCollections = function validateCollections(collections) {
         }
 
         // CASE: notation /:slug/ or /:primary_author/ is not allowed. We only accept /{{...}}/.
-        if (routingTypeObject.permalink && routingTypeObject.permalink.match(/\/\:\w+/)) {
+        if (routingTypeObject.permalink && routingTypeObject.permalink.match(/\/:\w+/)) {
             throw new common.errors.ValidationError({
                 message: common.i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject.permalink,
@@ -302,6 +310,7 @@ _private.validateCollections = function validateCollections(collections) {
 };
 
 _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
+    const validRoutingTypeObjectKeys = Object.keys(RESOURCE_CONFIG.TAXONOMIES);
     _.each(taxonomies, (routingTypeObject, routingTypeObjectKey) => {
         if (!routingTypeObject) {
             throw new common.errors.ValidationError({
@@ -310,6 +319,15 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
                     reason: 'Please define a taxonomy permalink route.'
                 }),
                 help: 'e.g. tag: /tag/{slug}/'
+            });
+        }
+
+        if (!validRoutingTypeObjectKeys.includes(routingTypeObjectKey)) {
+            throw new common.errors.ValidationError({
+                message: common.i18n.t('errors.services.settings.yaml.validate', {
+                    at: routingTypeObjectKey,
+                    reason: 'Unknown taxonomy.'
+                })
             });
         }
 
@@ -334,7 +352,7 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
         }
 
         // CASE: notation /:slug/ or /:primary_author/ is not allowed. We only accept /{{...}}/.
-        if (routingTypeObject && routingTypeObject.match(/\/\:\w+/)) {
+        if (routingTypeObject && routingTypeObject.match(/\/:\w+/)) {
             throw new common.errors.ValidationError({
                 message: common.i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject,
@@ -373,6 +391,12 @@ module.exports = function validate(object) {
     if (!object.taxonomies) {
         object.taxonomies = {};
     }
+
+    const apiVersion = themeService.getApiVersion();
+
+    debug('api version', apiVersion);
+
+    RESOURCE_CONFIG = require(`../../services/routing/config/${apiVersion}`);
 
     object.routes = _private.validateRoutes(object.routes);
     object.collections = _private.validateCollections(object.collections);

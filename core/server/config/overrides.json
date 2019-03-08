@@ -54,7 +54,7 @@
         },
         "routes": {
             "extensions": [".yaml"],
-            "contentTypes": ["text/plain", "text/yaml", "application/octet-stream", "application/yaml"]
+            "contentTypes": ["text/plain", "text/yaml", "application/octet-stream", "application/yaml", "application/x-yaml"]
         }
     },
     "times": {
@@ -64,5 +64,19 @@
     },
     "maintenance": {
         "enabled": false
+    },
+    "api": {
+        "versions": {
+            "all": ["v0.1", "v2"],
+            "v2": {
+                "admin": "v2/admin",
+                "content": "v2/content",
+                "members": "v2/members"
+            },
+            "v0.1": {
+                "admin": "v0.1",
+                "content": "v0.1"
+            }
+        }
     }
 }

@@ -8,8 +8,10 @@ const middlewares = require('./middlewares');
 const RSSRouter = require('./RSSRouter');
 
 class CollectionRouter extends ParentRouter {
-    constructor(mainRoute, object) {
+    constructor(mainRoute, object, RESOURCE_CONFIG) {
         super('CollectionRouter');
+
+        this.RESOURCE_CONFIG = RESOURCE_CONFIG.QUERY.post;
 
         this.routerName = mainRoute === '/' ? 'index' : mainRoute.replace(/\//g, '');
 
@@ -28,7 +30,7 @@ class CollectionRouter extends ParentRouter {
         // @NOTE: see helpers/templates - we use unshift to prepend the templates
         this.templates = (object.templates || []).reverse();
 
-        this.filter = object.filter || 'page:false';
+        this.filter = object.filter;
         this.data = object.data || {query: {}, router: {}};
         this.order = object.order;
         this.limit = object.limit;
@@ -66,12 +68,15 @@ class CollectionRouter extends ParentRouter {
 
         // REGISTER: is rss enabled?
         if (this.rss) {
-            this.rssRouter =  new RSSRouter();
+            this.rssRouter = new RSSRouter();
             this.mountRouter(this.route.value, this.rssRouter.router());
         }
 
         // REGISTER: context middleware for entries
         this.router().use(this._prepareEntryContext.bind(this));
+
+        // REGISTER: page/post resource redirects
+        this.router().param('slug', this._respectDominantRouter.bind(this));
 
         // REGISTER: permalinks e.g. /:slug/, /podcast/:slug
         this.mountRoute(this.permalinks.getValue({withUrlOptions: true}), controllers.entry);
@@ -82,8 +87,6 @@ class CollectionRouter extends ParentRouter {
     /**
      * We attach context information of the router to the request.
      * By this we can e.g. access the router options in controllers.
-     *
-     * @TODO: Why do we need two context objects? O_O - refactor this out
      */
     _prepareEntriesContext(req, res, next) {
         res.routerOptions = {
@@ -93,6 +96,7 @@ class CollectionRouter extends ParentRouter {
             order: this.order,
             permalinks: this.permalinks.getValue({withUrlOptions: true}),
             resourceType: this.getResourceType(),
+            query: this.RESOURCE_CONFIG,
             context: this.context,
             frontPageTemplate: 'home',
             templates: this.templates,
@@ -124,7 +128,7 @@ class CollectionRouter extends ParentRouter {
 
     _onTimezoneEdited(settingModel) {
         const newTimezone = settingModel.attributes.value,
-            previousTimezone = settingModel._updatedAttributes.value;
+            previousTimezone = settingModel._previousAttributes.value;
 
         if (newTimezone === previousTimezone) {
             return;
@@ -137,7 +141,7 @@ class CollectionRouter extends ParentRouter {
     }
 
     getResourceType() {
-        return 'posts';
+        return this.RESOURCE_CONFIG.resourceAlias || this.RESOURCE_CONFIG.resource;
     }
 
     getRoute(options) {

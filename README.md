@@ -13,13 +13,13 @@
     <a href="https://ghost.org/features">Features</a> |
     <a href="https://ghost.org/customers">Showcase</a> |
     <a href="https://forum.ghost.org">Forum</a> |
-    <a href="https://docs.ghost.org/docs">Documentation</a> |
-    <a href="https://docs.ghost.org/docs/contributing">Contributing</a> |
+    <a href="https://docs.ghost.org/">Documentation</a> |
+    <a href="https://github.com/TryGhost/Ghost/blob/master/.github/CONTRIBUTING.md">Contributing</a> |
     <a href="https://opencollective.com/ghost">Donate</a> |
     <a href="https://twitter.com/tryghost">Twitter</a>
     <br /><br />
     <a href="https://ghost.org">
-        <img src="https://img.shields.io/badge/downloads-1.3M-brightgreen.svg" alt="Downloads" />
+        <img src="https://img.shields.io/badge/downloads-1.4M-brightgreen.svg" alt="Downloads" />
     </a>
     <a href="https://github.com/TryGhost/Ghost/releases/">
         <img src="https://img.shields.io/github/release/TryGhost/Ghost.svg" alt="Latest release" />
@@ -69,7 +69,7 @@ $ npm install ghost-cli -g
 
 &nbsp;
 
-Then, if installing locally add the `local` flag to get up and running in under a minute - [Local install docs](https://docs.ghost.org/docs/install-local)
+Then, if installing locally add the `local` flag to get up and running in under a minute - [Local install docs](https://docs.ghost.org/install/local)
 
 ```
 $ ghost install local
@@ -77,7 +77,7 @@ $ ghost install local
 
 &nbsp;
 
-or on a server run the full install, including automatic SSL setup using LetsEncrypt - [Production install docs](https://docs.ghost.org/docs/install)
+or on a server run the full install, including automatic SSL setup using LetsEncrypt - [Production install docs](https://docs.ghost.org/install/ubuntu/)
 
 ```
 $ ghost install
@@ -85,7 +85,7 @@ $ ghost install
 
 &nbsp;
 
-Check out our [official documentation](https://docs.ghost.org/docs) for more information about our [recommended hosting stack](https://docs.ghost.org/docs/hosting) & properly [upgrading Ghost](https://docs.ghost.org/docs/upgrade), plus everything you need to develop your own Ghost [themes](https://themes.ghost.org/docs) or work with [our API](https://api.ghost.org/docs).
+Check out our [official documentation](https://docs.ghost.org) for more information about our [recommended hosting stack](https://docs.ghost.org/concepts/hosting) & properly [upgrading Ghost](https://docs.ghost.org/docs/upgrade), plus everything you need to develop your own Ghost [themes](https://docs.ghost.org/api/handlebars-themes) or work with [our API](https://api.ghost.org/docs).
 
 &nbsp;
 
@@ -101,11 +101,11 @@ To stay up to date with all the latest news and product updates, make sure you [
 
 # Contributors & Advanced Developers
 
-For anyone wishing to contribute to Ghost or to hack/customise core files we recommend following our full development setup guides: [General Contributor Guide](https://docs.ghost.org/docs/contributing) | [Developer Setup Instructions](https://docs.ghost.org/docs/working-with-ghost) | [Admin Client development guide](https://docs.ghost.org/docs/working-with-the-admin-client)
+For anyone wishing to contribute to Ghost or to hack/customise core files we recommend following our full development setup guides: [General Contributor Guide](https://docs.ghost.org/concepts/contributing) | [Developer Setup Instructions](https://docs.ghost.org/install/source) | [Admin Client development guide](https://docs.ghost.org/install/source/#ghost-admin)
 
 &nbsp;
 
 
 # Copyright & License
 
-Copyright (c) 2013-2018 Ghost Foundation - Released under the [MIT license](LICENSE). Ghost and the Ghost Logo are trademarks of Ghost Foundation Ltd. Please see our [trademark policy](https://ghost.org/trademark/) for info on acceptable usage.
+Copyright (c) 2013-2019 Ghost Foundation - Released under the [MIT license](LICENSE). Ghost and the Ghost Logo are trademarks of Ghost Foundation Ltd. Please see our [trademark policy](https://ghost.org/trademark/) for info on acceptable usage.

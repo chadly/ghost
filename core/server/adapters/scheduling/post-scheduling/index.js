@@ -3,7 +3,6 @@ const Promise = require('bluebird'),
     localUtils = require('../utils'),
     common = require('../../../lib/common'),
     models = require('../../../models'),
-    schedules = require('../../../api/schedules'),
     urlService = require('../../../services/url'),
     _private = {};
 
@@ -15,7 +14,7 @@ _private.normalize = function normalize(options) {
         url: `${urlService.utils.urlJoin(apiUrl, 'schedules', 'posts', object.get('id'))}?client_id=${client.get('slug')}&client_secret=${client.get('secret')}`,
         extra: {
             httpMethod: 'PUT',
-            oldTime: object.updated('published_at') ? moment(object.updated('published_at')).valueOf() : null
+            oldTime: object.previous('published_at') ? moment(object.previous('published_at')).valueOf() : null
         }
     };
 };
@@ -25,7 +24,8 @@ _private.loadClient = function loadClient() {
 };
 
 _private.loadScheduledPosts = function () {
-    return schedules.getScheduledPosts()
+    const api = require('../../../api');
+    return api.schedules.getScheduledPosts()
         .then((result) => {
             return result.posts || [];
         });

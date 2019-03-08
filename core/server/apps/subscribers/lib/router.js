@@ -1,28 +1,25 @@
-var path = require('path'),
-    express = require('express'),
+const path = require('path'),
     _ = require('lodash'),
+    express = require('express'),
     subscribeRouter = express.Router(),
     bodyParser = require('body-parser'),
-
     // Dirty requires
-    api = require('../../../api'),
     common = require('../../../lib/common'),
     urlService = require('../../../services/url'),
     validator = require('../../../data/validation').validator,
     routing = require('../../../services/routing'),
-
     templateName = 'subscribe';
 
 function _renderer(req, res) {
     res.routerOptions = {
         type: 'custom',
         templates: templateName,
-        defaultTemplate: path.resolve(__dirname, 'views', templateName + '.hbs')
+        defaultTemplate: path.resolve(__dirname, 'views', `${templateName}.hbs`)
     };
 
     // Renderer begin
     // Format data
-    var data = req.body;
+    const data = req.body;
 
     // Render Call
     return routing.helpers.renderer(req, res, data);
@@ -35,6 +32,8 @@ function _renderer(req, res) {
  */
 function errorHandler(error, req, res, next) {
     req.body.email = '';
+    req.body.subscribed_url = santizeUrl(req.body.subscribed_url);
+    req.body.subscribed_referrer = santizeUrl(req.body.subscribed_referrer);
 
     if (error.statusCode !== 404) {
         res.locals.error = error;
@@ -77,6 +76,8 @@ function handleSource(req, res, next) {
 function storeSubscriber(req, res, next) {
     req.body.status = 'subscribed';
 
+    const api = require('../../../api')[res.locals.apiVersion];
+
     if (_.isEmpty(req.body.email)) {
         return next(new common.errors.ValidationError({message: 'Email cannot be blank.'}));
     } else if (!validator.isEmail(req.body.email)) {
@@ -84,11 +85,11 @@ function storeSubscriber(req, res, next) {
     }
 
     return api.subscribers.add({subscribers: [req.body]}, {context: {external: true}})
-        .then(function () {
+        .then(() => {
             res.locals.success = true;
             next();
         })
-        .catch(function () {
+        .catch(() => {
             // we do not expose any information
             res.locals.success = true;
             next();

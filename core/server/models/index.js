@@ -26,11 +26,19 @@ models = [
     'refreshtoken',
     'role',
     'settings',
+    'session',
     'subscriber',
     'tag',
+    'tag-public',
     'user',
+    'author',
     'invite',
-    'webhook'
+    'webhook',
+    'integration',
+    'api-key',
+    'mobiledoc-revision',
+    'member',
+    'action'
 ];
 
 function init() {
