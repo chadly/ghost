@@ -1,5 +1,4 @@
 const debug = require('ghost-ignition').debug('services:routing:controllers:preview'),
-    api = require('../../../api'),
     urlService = require('../../url'),
     filters = require('../../../filters'),
     helpers = require('../helpers');
@@ -7,15 +6,18 @@ const debug = require('ghost-ignition').debug('services:routing:controllers:prev
 module.exports = function previewController(req, res, next) {
     debug('previewController');
 
+    const api = require('../../../api')[res.locals.apiVersion];
+
     const params = {
         uuid: req.params.uuid,
         status: 'all',
         include: 'author,authors,tags'
     };
 
-    api.posts.read(params)
+    api[res.routerOptions.query.controller]
+        .read(params)
         .then(function then(result) {
-            const post = result.posts[0];
+            const post = result[res.routerOptions.query.resource][0];
 
             if (!post) {
                 return next();

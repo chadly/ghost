@@ -63,10 +63,12 @@ function getPostData(req, res, next) {
         }));
     }
 
-    helpers.postLookup(urlWithoutSubdirectoryWithoutAmp, {permalinks})
+    // @NOTE: amp is not supported for static pages
+    // @TODO: https://github.com/TryGhost/Ghost/issues/10548
+    helpers.entryLookup(urlWithoutSubdirectoryWithoutAmp, {permalinks, query: {controller: 'postsPublic', resource: 'posts'}}, res.locals)
         .then((result) => {
-            if (result && result.post) {
-                req.body.post = result.post;
+            if (result && result.entry) {
+                req.body.post = result.entry;
             }
 
             next();

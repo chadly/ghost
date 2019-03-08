@@ -2,6 +2,7 @@ const Promise = require('bluebird'),
     _ = require('lodash'),
     uuid = require('uuid'),
     crypto = require('crypto'),
+    keypair = require('keypair'),
     ghostBookshelf = require('./base'),
     common = require('../lib/common'),
     validation = require('../data/validation'),
@@ -17,8 +18,17 @@ function parseDefaultSettings() {
         defaultSettingsFlattened = {},
         dynamicDefault = {
             db_hash: uuid.v4(),
-            public_hash: crypto.randomBytes(15).toString('hex')
+            public_hash: crypto.randomBytes(15).toString('hex'),
+            session_secret: crypto.randomBytes(32).toString('hex'),
+            members_session_secret: crypto.randomBytes(32).toString('hex')
         };
+
+    const membersKeypair = keypair({
+        bits: 1024
+    });
+
+    dynamicDefault.members_public_key = membersKeypair.public;
+    dynamicDefault.members_private_key = membersKeypair.private;
 
     _.each(defaultSettingsInCategories, function each(settings, categoryName) {
         _.each(settings, function each(setting, settingName) {
@@ -61,16 +71,22 @@ Settings = ghostBookshelf.Model.extend({
     },
 
     onDestroyed: function onDestroyed(model, options) {
+        ghostBookshelf.Model.prototype.onDestroyed.apply(this, arguments);
+
         model.emitChange('deleted', options);
         model.emitChange(model._previousAttributes.key + '.' + 'deleted', options);
     },
 
     onCreated: function onCreated(model, response, options) {
+        ghostBookshelf.Model.prototype.onCreated.apply(this, arguments);
+
         model.emitChange('added', options);
         model.emitChange(model.attributes.key + '.' + 'added', options);
     },
 
     onUpdated: function onUpdated(model, response, options) {
+        ghostBookshelf.Model.prototype.onUpdated.apply(this, arguments);
+
         model.emitChange('edited', options);
         model.emitChange(model.attributes.key + '.' + 'edited', options);
     },
@@ -82,6 +98,27 @@ Settings = ghostBookshelf.Model.extend({
             .then(function then() {
                 return validation.validateSettings(getDefaultSettings(), self);
             });
+    },
+
+    parse() {
+        const attrs = ghostBookshelf.Model.prototype.parse.apply(this, arguments);
+
+        // transform "0" to false
+        // transform "false" to false
+        // transform "null" to null
+        if (attrs.value === '0' || attrs.value === '1') {
+            attrs.value = !!+attrs.value;
+        }
+
+        if (attrs.value === 'false' || attrs.value === 'true') {
+            attrs.value = JSON.parse(attrs.value);
+        }
+
+        if (attrs.value === 'null') {
+            attrs.value = null;
+        }
+
+        return attrs;
     }
 }, {
     findOne: function (data, options) {
