@@ -1,4 +1,6 @@
-const memberUserObject = require('../../services/members').api.memberUserObject;
+// NOTE: We must not cache references to membersService.api
+// as it is a getter and may change during runtime.
+const membersService = require('../../services/members');
 
 const members = {
     docName: 'members',
@@ -14,7 +16,7 @@ const members = {
         permissions: true,
         validation: {},
         query(frame) {
-            return memberUserObject.list(frame.options);
+            return membersService.api.members.list(frame.options);
         }
     },
 
@@ -27,7 +29,27 @@ const members = {
         validation: {},
         permissions: true,
         query(frame) {
-            return memberUserObject.get(frame.data, frame.options);
+            return membersService.api.members.get(frame.data, frame.options);
+        }
+    },
+
+    destroy: {
+        statusCode: 204,
+        headers: {},
+        options: [
+            'id'
+        ],
+        validation: {
+            options: {
+                id: {
+                    required: true
+                }
+            }
+        },
+        permissions: true,
+        query(frame) {
+            frame.options.require = true;
+            return membersService.api.members.destroy(frame.options).return(null);
         }
     }
 };

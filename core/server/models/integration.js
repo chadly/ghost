@@ -16,6 +16,11 @@ const Integration = ghostBookshelf.Model.extend({
         };
     },
 
+    emitChange: function emitChange(event, options) {
+        const eventToTrigger = 'integration' + '.' + event;
+        ghostBookshelf.Model.prototype.emitChange.bind(this)(this, eventToTrigger, options);
+    },
+
     add(data, options) {
         const addIntegration = () => {
             return ghostBookshelf.Model.add.call(this, data, options)
@@ -67,6 +72,12 @@ const Integration = ghostBookshelf.Model.extend({
         }
     },
 
+    onCreated: function onCreated(model, response, options) {
+        ghostBookshelf.Model.prototype.onCreated.apply(this, arguments);
+
+        model.emitChange('added', options);
+    },
+
     permittedAttributes(...args) {
         return ghostBookshelf.Model.prototype.permittedAttributes.apply(this, args).concat(this.relationships);
     },
@@ -77,6 +88,16 @@ const Integration = ghostBookshelf.Model.extend({
 
     webhooks: function webhooks() {
         return this.hasMany('Webhook', 'integration_id');
+    }
+}, {
+    permittedOptions(methodName) {
+        let options = ghostBookshelf.Model.permittedOptions.call(this, methodName);
+
+        if (methodName === 'findOne') {
+            options = options.concat(['filter']);
+        }
+
+        return options;
     }
 });
 

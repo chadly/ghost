@@ -1,11 +1,12 @@
 const url = require('url');
 const settingsCache = require('../settings/cache');
-const config = require('../../config');
-const MembersApi = require('../../lib/members');
+const urlUtils = require('../../lib/url-utils');
+const MembersApi = require('@tryghost/members-api');
 const common = require('../../lib/common');
 const models = require('../../models');
 const mail = require('../mail');
 const blogIcon = require('../../lib/image/blog-icon');
+const doBlock = fn => fn();
 
 function createMember({name, email, password}) {
     return models.Member.add({
@@ -27,13 +28,23 @@ function updateMember(member, newData) {
     });
 }
 
-function getMember(data, options) {
-    options = options || {};
-    return models.Member.findOne(data, options).then((model) => {
+function getMember(data, options = {}) {
+    return models.Member.findOne(data, Object.assign({require: true}, options)).then((model) => {
         if (!model) {
             return null;
         }
         return model.toJSON(options);
+    });
+}
+
+function deleteMember(options) {
+    options = options || {};
+    return models.Member.destroy(options).catch(models.Member.NotFoundError, () => {
+        throw new common.errors.NotFoundError({
+            message: common.i18n.t('errors.api.resource.resourceNotFound', {
+                resource: 'Member'
+            })
+        });
     });
 }
 
@@ -61,7 +72,7 @@ function validateMember({email, password}) {
     });
 }
 
-function parseMembersSettings() {
+function getSubscriptionSettings() {
     let membersSettings = settingsCache.get('members_subscription_settings');
     if (!membersSettings) {
         membersSettings = {
@@ -98,109 +109,104 @@ function parseMembersSettings() {
     return membersSettings;
 }
 
-const publicKey = settingsCache.get('members_public_key');
-const privateKey = settingsCache.get('members_private_key');
-const sessionSecret = settingsCache.get('members_session_secret');
-const passwordResetUrl = config.get('url');
-const {protocol, host} = url.parse(config.get('url'));
-const siteOrigin = `${protocol}//${host}`;
-const issuer = siteOrigin;
-const ssoOrigin = siteOrigin;
-let mailer;
-
-const membersConfig = config.get('members');
-const membersSettings = parseMembersSettings();
-
-function validateAudience({audience, origin}) {
-    if (audience === origin) {
-        return Promise.resolve();
-    }
-    if (audience === siteOrigin) {
-        if (membersConfig.contentApiAccess.includes(origin)) {
-            return Promise.resolve();
-        }
-    }
-    return Promise.reject();
-}
-
-function sendEmail(member, {token}) {
-    if (!(mailer instanceof mail.GhostMailer)) {
-        mailer = new mail.GhostMailer();
-    }
-    const message = {
-        to: member.email,
-        subject: 'Reset password',
-        html: `
-        Hi ${member.name},
-
-        To reset your password, click the following link and follow the instructions:
-
-        ${passwordResetUrl}#reset-password?token=${token}
-
-        If you didn't request a password change, just ignore this email.
-        `
-    };
-
-    /* eslint-disable */
-    // @TODO remove this
-    console.log(message.html);
-    /* eslint-enable */
-    return mailer.send(message).catch((err) => {
-        return Promise.reject(err);
-    });
-}
-
-const defaultBlogTitle = settingsCache.get('title') ? settingsCache.get('title').replace(/"/g, '\\"') : 'Publication';
-const blogIconUrl = blogIcon.getIconUrl();
-const api = MembersApi({
-    authConfig: {
-        issuer,
-        publicKey,
-        privateKey,
-        sessionSecret,
-        ssoOrigin
-    },
-    paymentConfig: {
-        processors: membersSettings.paymentProcessors
-    },
-    siteConfig: {
-        title: defaultBlogTitle,
-        icon: blogIconUrl
-    },
-    validateAudience,
-    createMember,
-    getMember,
-    listMembers,
-    validateMember,
-    updateMember,
-    sendEmail
+const siteUrl = urlUtils.getSiteUrl();
+const siteOrigin = doBlock(() => {
+    const {protocol, host} = url.parse(siteUrl);
+    return `${protocol}//${host}`;
 });
 
-const updateSettingFromModel = function updateSettingFromModel(settingModel) {
-    if (settingModel.get('key') === 'members_subscription_settings'
-            || settingModel.get('key') === 'title'
-        || settingModel.get('key') === 'icon') {
-        let membersSettings = parseMembersSettings();
-        const defaultBlogTitle = settingsCache.get('title') ? settingsCache.get('title').replace(/"/g, '\\"') : 'Publication';
-        const blogIconUrl = blogIcon.getIconUrl();
-        api.reconfigureSettings({
-            paymentConfig: {
-                processors: membersSettings.paymentProcessors
-            },
-            siteConfig: {
-                title: defaultBlogTitle,
-                icon: blogIconUrl
-            }
-        });
+const adminOrigin = doBlock(() => {
+    const {protocol, host} = url.parse(urlUtils.urlFor('admin', true));
+    return `${protocol}//${host}`;
+});
+
+const getApiUrl = ({version, type}) => {
+    const {href} = new url.URL(
+        urlUtils.getApiPath({version, type}),
+        urlUtils.urlFor('admin', true)
+    );
+    return href;
+};
+
+const contentApiUrl = getApiUrl({version: 'v2', type: 'content'});
+const membersApiUrl = getApiUrl({version: 'v2', type: 'members'});
+
+const accessControl = {
+    [siteOrigin]: {
+        [contentApiUrl]: {
+            tokenLength: '20m'
+        },
+        [membersApiUrl]: {
+            tokenLength: '180d'
+        }
+    },
+    '*': {
+        tokenLength: '20m'
     }
 };
 
-// Bind to events to automatically keep subscription info up-to-date from settings
-common.events.on('settings.edited', updateSettingFromModel);
+const sendEmail = (function createSendEmail(mailer) {
+    return function sendEmail(member, {token}) {
+        if (!(mailer instanceof mail.GhostMailer)) {
+            mailer = new mail.GhostMailer();
+        }
+        const message = {
+            to: member.email,
+            subject: 'Reset password',
+            html: `
+            Hi ${member.name},
 
-module.exports = api;
-module.exports.publicKey = publicKey;
-module.exports.isPaymentConfigured = function () {
-    let membersSettings = parseMembersSettings();
-    return !!membersSettings.paymentProcessors.length;
+            To reset your password, click the following link and follow the instructions:
+
+            ${siteUrl}#reset-password?token=${token}
+
+            If you didn't request a password change, just ignore this email.
+            `
+        };
+
+        /* eslint-disable */
+        // @TODO remove this
+        console.log(message.html);
+        /* eslint-enable */
+        return mailer.send(message).catch((err) => {
+            return Promise.reject(err);
+        });
+    };
+})();
+
+const getSiteConfig = () => {
+    return {
+        title: settingsCache.get('title') ? settingsCache.get('title').replace(/"/g, '\\"') : 'Publication',
+        icon: blogIcon.getIconUrl()
+    };
 };
+
+module.exports = createApiInstance;
+
+function createApiInstance() {
+    const membersApiInstance = MembersApi({
+        authConfig: {
+            issuer: membersApiUrl,
+            ssoOrigin: adminOrigin,
+            publicKey: settingsCache.get('members_public_key'),
+            privateKey: settingsCache.get('members_private_key'),
+            sessionSecret: settingsCache.get('members_session_secret'),
+            accessControl
+        },
+        paymentConfig: {
+            processors: getSubscriptionSettings().paymentProcessors
+        },
+        siteConfig: getSiteConfig(),
+        createMember,
+        getMember,
+        deleteMember,
+        listMembers,
+        validateMember,
+        updateMember,
+        sendEmail
+    });
+
+    membersApiInstance.setLogger(common.logging);
+
+    return membersApiInstance;
+}

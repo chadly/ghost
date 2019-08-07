@@ -15,8 +15,7 @@ module.exports = function apiRoutes() {
     // alias delete with del
     router.del = router.delete;
 
-    // ## CORS pre-flight check
-    router.options('*', shared.middlewares.api.cors);
+    router.use(shared.middlewares.api.cors);
 
     const http = apiv2.http;
 
@@ -109,6 +108,7 @@ module.exports = function apiRoutes() {
     // ## Members
     router.get('/members', shared.middlewares.labs.members, mw.authAdminApi, http(apiv2.members.browse));
     router.get('/members/:id', shared.middlewares.labs.members, mw.authAdminApi, http(apiv2.members.read));
+    router.del('/members/:id', shared.middlewares.labs.members, mw.authAdminApi, http(apiv2.members.destroy));
 
     // ## Roles
     router.get('/roles/', mw.authAdminApi, http(apiv2.roles.browse));
@@ -184,14 +184,14 @@ module.exports = function apiRoutes() {
     router.post('/authentication/passwordreset',
         shared.middlewares.brute.globalReset,
         shared.middlewares.brute.userReset,
-        api.http(api.authentication.generateResetToken)
+        http(apiv2.authentication.generateResetToken)
     );
-    router.put('/authentication/passwordreset', shared.middlewares.brute.globalBlock, api.http(api.authentication.resetPassword));
-    router.post('/authentication/invitation', api.http(api.authentication.acceptInvitation));
-    router.get('/authentication/invitation', api.http(api.authentication.isInvitation));
-    router.post('/authentication/setup', api.http(api.authentication.setup));
-    router.put('/authentication/setup', mw.authAdminApi, api.http(api.authentication.updateSetup));
-    router.get('/authentication/setup', api.http(api.authentication.isSetup));
+    router.put('/authentication/passwordreset', shared.middlewares.brute.globalBlock, http(apiv2.authentication.resetPassword));
+    router.post('/authentication/invitation', http(apiv2.authentication.acceptInvitation));
+    router.get('/authentication/invitation', http(apiv2.authentication.isInvitation));
+    router.post('/authentication/setup', http(apiv2.authentication.setup));
+    router.put('/authentication/setup', mw.authAdminApi, http(apiv2.authentication.updateSetup));
+    router.get('/authentication/setup', http(apiv2.authentication.isSetup));
 
     // ## Images
     router.post('/images/upload',

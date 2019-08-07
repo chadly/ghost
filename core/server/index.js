@@ -14,14 +14,14 @@ const Promise = require('bluebird');
 const config = require('./config');
 const common = require('./lib/common');
 const migrator = require('./data/db/migrator');
-const urlService = require('./services/url');
+const urlUtils = require('./lib/url-utils');
 let parentApp;
 
 function initialiseServices() {
     // CASE: When Ghost is ready with bootstrapping (db migrations etc.), we can trigger the router creation.
     //       Reason is that the routers access the routes.yaml, which shouldn't and doesn't have to be validated to
     //       start Ghost in maintenance mode.
-    const routing = require('./services/routing');
+    const routing = require('../frontend/services/routing');
     routing.bootstrap.start();
 
     const permissions = require('./services/permissions'),
@@ -44,7 +44,9 @@ function initialiseServices() {
         scheduling.init({
             schedulerUrl: config.get('scheduling').schedulerUrl,
             active: config.get('scheduling').active,
-            apiUrl: urlService.utils.urlFor('api', {version: 'v0.1', versionType: 'content'}, true),
+            // NOTE: When changing API version need to consider how to migrate custom scheduling adapters
+            //       that rely on URL to lookup persisted scheduled records (jobs, etc.). Ref: https://github.com/TryGhost/Ghost/pull/10726#issuecomment-489557162
+            apiUrl: urlUtils.urlFor('api', {version: 'v0.1', versionType: 'content'}, true),
             internalPath: config.get('paths').internalSchedulingPath,
             contentPath: config.getContentPath('scheduling')
         })
@@ -75,7 +77,8 @@ function initialiseServices() {
 const minimalRequiredSetupToStartGhost = (dbState) => {
     const settings = require('./services/settings');
     const models = require('./models');
-    const themes = require('./services/themes');
+    const frontendSettings = require('../frontend/services/settings');
+    const themes = require('../frontend/services/themes');
     const GhostServer = require('./ghost-server');
 
     let ghostServer;
@@ -90,6 +93,11 @@ const minimalRequiredSetupToStartGhost = (dbState) => {
     return settings.init()
         .then(() => {
             debug('Settings done');
+
+            return frontendSettings.init();
+        })
+        .then(() => {
+            debug('Frontend settings done');
             return themes.init();
         })
         .then(() => {

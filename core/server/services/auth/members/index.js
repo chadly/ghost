@@ -18,21 +18,18 @@ module.exports = {
             const {protocol, host} = url.parse(config.get('url'));
             const siteOrigin = `${protocol}//${host}`;
 
-            UNO_MEMBERINO = jwt({
+            UNO_MEMBERINO = membersService.api.getPublicConfig().then(({issuer}) => jwt({
                 credentialsRequired: false,
                 requestProperty: 'member',
                 audience: siteOrigin,
-                issuer: siteOrigin,
+                issuer,
                 algorithm: 'RS512',
-                secret: membersService.api.publicKey,
+                secret(req, payload, done) {
+                    membersService.api.getPublicConfig().then(({publicKey}) => {
+                        done(null, publicKey);
+                    }).catch(done);
+                },
                 getToken(req) {
-                    if (req.get('cookie')) {
-                        const memberTokenMatch = req.get('cookie').match(/member=([a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]*)/);
-                        if (memberTokenMatch) {
-                            return memberTokenMatch[1];
-                        }
-                    }
-
                     if (!req.get('authorization')) {
                         return null;
                     }
@@ -45,8 +42,10 @@ module.exports = {
 
                     return credentials;
                 }
-            });
+            }));
         }
-        return UNO_MEMBERINO;
+        return function (req, res, next) {
+            UNO_MEMBERINO.then(fn => fn(req, res, next)).catch(next);
+        };
     }
 };
