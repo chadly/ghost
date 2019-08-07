@@ -13,10 +13,10 @@
     <a href="https://ghost.org/features">Features</a> |
     <a href="https://ghost.org/customers">Showcase</a> |
     <a href="https://forum.ghost.org">Forum</a> |
-    <a href="https://docs.ghost.org/">Documentation</a> |
+    <a href="https://ghost.org/docs/">Documentation</a> |
     <a href="https://github.com/TryGhost/Ghost/blob/master/.github/CONTRIBUTING.md">Contributing</a> |
     <a href="https://opencollective.com/ghost">Donate</a> |
-    <a href="https://twitter.com/tryghost">Twitter</a>
+    <a href="https://twitter.com/ghost">Twitter</a>
     <br /><br />
     <a href="https://ghost.org">
         <img src="https://img.shields.io/badge/downloads-1.4M-brightgreen.svg" alt="Downloads" />
@@ -69,7 +69,7 @@ $ npm install ghost-cli -g
 
 &nbsp;
 
-Then, if installing locally add the `local` flag to get up and running in under a minute - [Local install docs](https://docs.ghost.org/install/local)
+Then, if installing locally add the `local` flag to get up and running in under a minute - [Local install docs](https://ghost.org/docs/install/local/)
 
 ```
 $ ghost install local
@@ -77,7 +77,7 @@ $ ghost install local
 
 &nbsp;
 
-or on a server run the full install, including automatic SSL setup using LetsEncrypt - [Production install docs](https://docs.ghost.org/install/ubuntu/)
+or on a server run the full install, including automatic SSL setup using LetsEncrypt - [Production install docs](https://ghost.org/docs/install/ubuntu/)
 
 ```
 $ ghost install
@@ -85,7 +85,7 @@ $ ghost install
 
 &nbsp;
 
-Check out our [official documentation](https://docs.ghost.org) for more information about our [recommended hosting stack](https://docs.ghost.org/concepts/hosting) & properly [upgrading Ghost](https://docs.ghost.org/docs/upgrade), plus everything you need to develop your own Ghost [themes](https://docs.ghost.org/api/handlebars-themes) or work with [our API](https://api.ghost.org/docs).
+Check out our [official documentation](https://ghost.org/docs/) for more information about our [recommended hosting stack](https://ghost.org/docs/concepts/hosting/) & properly [upgrading Ghost](https://ghost.org/faq/upgrade-to-ghost-2-0/), plus everything you need to develop your own Ghost [themes](https://ghost.org/docs/api/handlebars-themes/) or work with [our API](https://ghost.org/docs/api/).
 
 &nbsp;
 
@@ -94,14 +94,14 @@ Check out our [official documentation](https://docs.ghost.org) for more informat
 
 You can find answers to a huge variety of questions, along with a large community of helpful developers over on the [Ghost forum](https://forum.ghost.org/) - replies are generally very quick. **Ghost(Pro)** customers also have access to 24/7 email support.
 
-To stay up to date with all the latest news and product updates, make sure you [subscribe to our blog](https://blog.ghost.org) — or your can always follow us [on Twitter](https://twitter.com/tryghost/), if you prefer your updates bite-sized and facetious. :saxophone::turtle:
+To stay up to date with all the latest news and product updates, make sure you [subscribe to our blog](https://ghost.org/blog/) — or you can always follow us [on Twitter](https://twitter.com/Ghost), if you prefer your updates bite-sized and facetious. :saxophone::turtle:
 
 &nbsp;
 
 
 # Contributors & Advanced Developers
 
-For anyone wishing to contribute to Ghost or to hack/customise core files we recommend following our full development setup guides: [General Contributor Guide](https://docs.ghost.org/concepts/contributing) | [Developer Setup Instructions](https://docs.ghost.org/install/source) | [Admin Client development guide](https://docs.ghost.org/install/source/#ghost-admin)
+For anyone wishing to contribute to Ghost or to hack/customise core files we recommend following our full development setup guides: [General Contributor Guide](https://ghost.org/docs/concepts/contributing/) | [Developer Setup Instructions](https://ghost.org/docs/install/source/) | [Admin Client development guide](https://ghost.org/docs/install/source/#ghost-admin)
 
 &nbsp;
 

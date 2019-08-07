@@ -4,17 +4,19 @@ const express = require('express');
 
 // App requires
 const config = require('../../config');
+const common = require('../../lib/common');
 const apps = require('../../services/apps');
 const constants = require('../../lib/constants');
 const storage = require('../../adapters/storage');
-const urlService = require('../../services/url');
-const members = require('../../services/auth/members');
-const sitemapHandler = require('../../data/xml/sitemap/handler');
-const themeMiddleware = require('../../services/themes').middleware;
+const urlService = require('../../../frontend/services/url');
+const urlUtils = require('../../../server/lib/url-utils');
+const sitemapHandler = require('../../../frontend/services/sitemap/handler');
+const themeMiddleware = require('../../../frontend/services/themes').middleware;
+const membersService = require('../../services/members');
 const siteRoutes = require('./routes');
 const shared = require('../shared');
 
-const STATIC_IMAGE_URL_PREFIX = `/${urlService.utils.STATIC_IMAGE_URL_PREFIX}`;
+const STATIC_IMAGE_URL_PREFIX = `/${urlUtils.STATIC_IMAGE_URL_PREFIX}`;
 
 let router;
 
@@ -49,6 +51,25 @@ module.exports = function setupSiteApp(options = {}) {
     // /public/ghost-sdk.js
     siteApp.use(shared.middlewares.servePublicFile('public/ghost-sdk.js', 'application/javascript', constants.ONE_HOUR_S));
     siteApp.use(shared.middlewares.servePublicFile('public/ghost-sdk.min.js', 'application/javascript', constants.ONE_YEAR_S));
+
+    // /public/members.js
+    siteApp.get('/public/members-theme-bindings.js',
+        shared.middlewares.labs('members'),
+        shared.middlewares.servePublicFile.createPublicFileMiddleware(
+            'public/members-theme-bindings.js',
+            'application/javascript',
+            constants.ONE_HOUR_S
+        )
+    );
+    siteApp.get('/public/members.js',
+        shared.middlewares.labs('members'),
+        shared.middlewares.servePublicFile.createPublicFileMiddleware(
+            'public/members.js',
+            'application/javascript',
+            constants.ONE_HOUR_S
+        )
+    );
+
     // Serve sitemap.xsl file
     siteApp.use(shared.middlewares.servePublicFile('sitemap.xsl', 'text/xsl', constants.ONE_DAY_S));
 
@@ -67,20 +88,44 @@ module.exports = function setupSiteApp(options = {}) {
     // We do this here, at the top level, because helpers require so much stuff.
     // Moving this to being inside themes, where it probably should be requires the proxy to be refactored
     // Else we end up with circular dependencies
-    require('../../helpers').loadCoreHelpers();
+    require('../../../frontend/helpers').loadCoreHelpers();
     debug('Helpers done');
 
+    // @TODO only loads this stuff if members is enabled
     // Set req.member & res.locals.member if a cookie is set
-    siteApp.use(members.authenticateMembersToken);
+    siteApp.post('/members/ssr', shared.middlewares.labs.members, function (req, res) {
+        membersService.ssr.exchangeTokenForSession(req, res).then(() => {
+            res.writeHead(200);
+            res.end();
+        }).catch((err) => {
+            common.logging.warn(err.message);
+            res.writeHead(err.statusCode);
+            res.end(err.message);
+        });
+    });
+    siteApp.delete('/members/ssr', shared.middlewares.labs.members, function (req, res) {
+        membersService.ssr.deleteSession(req, res).then(() => {
+            res.writeHead(204);
+            res.end();
+        }).catch((err) => {
+            common.logging.warn(err.message);
+            res.writeHead(err.statusCode);
+            res.end(err.message);
+        });
+    });
+    siteApp.use(function (req, res, next) {
+        membersService.ssr.getMemberDataFromSession(req, res).then((member) => {
+            req.member = member;
+            next();
+        }).catch((err) => {
+            common.logging.warn(err.message);
+            req.member = null;
+            next();
+        });
+    });
     siteApp.use(function (req, res, next) {
         res.locals.member = req.member;
         next();
-    });
-    siteApp.use(function (err, req, res, next) {
-        if (err.name === 'UnauthorizedError') {
-            return next();
-        }
-        next(err);
     });
 
     // Theme middleware
@@ -102,7 +147,7 @@ module.exports = function setupSiteApp(options = {}) {
     config.get('apps:internal').forEach((appName) => {
         const app = require(path.join(config.get('paths').internalAppPath, appName));
 
-        if (app.hasOwnProperty('setupMiddleware')) {
+        if (Object.prototype.hasOwnProperty.call(app, 'setupMiddleware')) {
             app.setupMiddleware(siteApp);
         }
     });

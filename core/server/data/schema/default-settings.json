@@ -11,6 +11,9 @@
         },
         "session_secret": {
             "defaultValue": null
+        },
+        "theme_session_secret": {
+            "defaultValue": null
         }
     },
     "blog": {
@@ -68,7 +71,10 @@
             }
         },
         "amp": {
-            "defaultValue" : "true"
+            "defaultValue" : "true",
+            "validations": {
+                "isIn": [["true", "false"]]
+            }
         },
         "ghost_head": {
             "defaultValue" : ""
@@ -86,13 +92,77 @@
             "defaultValue": "{}"
         },
         "navigation": {
-            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://docs.ghost.org\"}]"
+            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://ghost.org/docs/\"}]"
         },
         "slack": {
             "defaultValue": "[{\"url\":\"\", \"username\":\"Ghost\"}]"
         },
         "unsplash": {
             "defaultValue": "{\"isActive\": true}"
+        },
+        "meta_title": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 300
+                }
+            }
+        },
+        "meta_description": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 500
+                }
+            }
+        },
+        "og_image": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 2000
+                }
+            }
+        },
+        "og_title": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 300
+                }
+            }
+        },
+        "og_description": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 300
+                }
+            }
+        },
+        "twitter_image": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 2000
+                }
+            }
+        },
+        "twitter_title": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 300
+                }
+            }
+        },
+        "twitter_description": {
+            "defaultValue": null,
+            "validations": {
+                "isLength": {
+                    "max": 300
+                }
+            }
         }
     },
     "theme": {
@@ -100,17 +170,12 @@
             "defaultValue": "casper"
         }
     },
-    "app": {
-        "active_apps": {
-            "defaultValue": "[]"
-        },
-        "installed_apps": {
-            "defaultValue": "[]"
-        }
-    },
     "private": {
         "is_private": {
-            "defaultValue": "false"
+            "defaultValue": "false",
+            "validations": {
+                "isIn": [["true", "false"]]
+            }
         },
         "password": {
             "defaultValue": ""

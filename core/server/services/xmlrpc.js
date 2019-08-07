@@ -1,7 +1,7 @@
 var _ = require('lodash'),
     xml = require('xml'),
     config = require('../config'),
-    urlService = require('../services/url'),
+    urlService = require('../../frontend/services/url'),
     common = require('../lib/common'),
     request = require('../lib/request'),
     settingsCache = require('./settings/cache'),
@@ -83,7 +83,7 @@ function ping(post) {
                     err: err,
                     message: err.message,
                     context: common.i18n.t('errors.services.ping.requestFailed.error', {service: 'xmlrpc'}),
-                    help: common.i18n.t('errors.services.ping.requestFailed.help', {url: 'https://docs.ghost.org'})
+                    help: common.i18n.t('errors.services.ping.requestFailed.help', {url: 'https://ghost.org/docs/'})
                 }));
             });
     });

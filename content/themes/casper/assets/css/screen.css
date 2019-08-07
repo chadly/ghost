@@ -941,6 +941,10 @@ Usage (In Ghost editor):
     border-radius: 5px;
 }
 
+.post-full-content pre ::selection {
+    color: color(var(--midgrey) l(-25%));
+}
+
 .post-full-content pre code {
     padding: 0;
     font-size: inherit;
@@ -1934,6 +1938,15 @@ Usage (In Ghost editor):
 .kg-image-card.kg-width-wide + .kg-gallery-card,
 .kg-image-card.kg-width-wide + .kg-image-card.kg-width-wide {
     margin: -2.25em 0 3em;
+}
+
+/* keep existing <pre> styles for code cards with captions */
+.kg-code-card {
+    min-width: 100%;
+}
+
+.kg-code-card pre {
+    margin: 0;
 }
 
 /* 8. Author Template

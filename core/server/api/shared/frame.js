@@ -1,10 +1,25 @@
 const debug = require('ghost-ignition').debug('api:shared:frame');
 const _ = require('lodash');
 
+/**
+ * @description The "frame" holds all information of a request.
+ *
+ * Each party can modify the frame by reference.
+ * A request hits a lot of stages in the API implementation and that's why modification by reference was the
+ * easiest to use. We always have access to the original input, we never loose track of it.
+ */
 class Frame {
     constructor(obj = {}) {
         this.original = obj;
 
+        /**
+         * options:     Query params, url params, context and custom options
+         * data:        Body or if the ctrl wants query/url params inside body
+         * user:        Logged in user
+         * file:        Uploaded file
+         * files:       Uploaded files
+         * apiType:     Content or admin api access
+         */
         this.options = {};
         this.data = {};
         this.user = {};
@@ -14,7 +29,12 @@ class Frame {
     }
 
     /**
-     * If you instantiate a new frame, all the data you pass in, land in `this.original`.
+     * @description Configure the frame.
+     *
+     * If you instantiate a new frame, all the data you pass in, land in `this.original`. This is helpful
+     * for debugging to see what the original input was.
+     *
+     * This function will prepare the incoming data for further processing.
      * Based on the API ctrl implemented, this fn will pick allowed properties to either options or data.
      */
     configure(apiConfig) {
@@ -25,15 +45,15 @@ class Frame {
                 apiConfig.options = apiConfig.options(this);
             }
 
-            if (this.original.hasOwnProperty('query')) {
+            if (Object.prototype.hasOwnProperty.call(this.original, 'query')) {
                 Object.assign(this.options, _.pick(this.original.query, apiConfig.options));
             }
 
-            if (this.original.hasOwnProperty('params')) {
+            if (Object.prototype.hasOwnProperty.call(this.original, 'params')) {
                 Object.assign(this.options, _.pick(this.original.params, apiConfig.options));
             }
 
-            if (this.original.hasOwnProperty('options')) {
+            if (Object.prototype.hasOwnProperty.call(this.original, 'options')) {
                 Object.assign(this.options, _.pick(this.original.options, apiConfig.options));
             }
         }
@@ -48,15 +68,15 @@ class Frame {
                     apiConfig.data = apiConfig.data(this);
                 }
 
-                if (this.original.hasOwnProperty('query')) {
+                if (Object.prototype.hasOwnProperty.call(this.original, 'query')) {
                     Object.assign(this.data, _.pick(this.original.query, apiConfig.data));
                 }
 
-                if (this.original.hasOwnProperty('params')) {
+                if (Object.prototype.hasOwnProperty.call(this.original, 'params')) {
                     Object.assign(this.data, _.pick(this.original.params, apiConfig.data));
                 }
 
-                if (this.original.hasOwnProperty('options')) {
+                if (Object.prototype.hasOwnProperty.call(this.original, 'options')) {
                     Object.assign(this.data, _.pick(this.original.options, apiConfig.data));
                 }
             }

@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const utils = require('../../../index');
 const url = require('./url');
 const date = require('./date');
@@ -25,9 +26,13 @@ const mapTag = (model, frame) => {
 };
 
 const mapPost = (model, frame) => {
-    const jsonModel = model.toJSON(frame.options);
+    const extendedOptions = Object.assign(_.cloneDeep(frame.options), {
+        extraProperties: ['canonical_url']
+    });
 
-    url.forPost(model.id, jsonModel, frame.options);
+    const jsonModel = model.toJSON(extendedOptions);
+
+    url.forPost(model.id, jsonModel, frame);
 
     if (utils.isContentAPI(frame)) {
         date.forPost(jsonModel);

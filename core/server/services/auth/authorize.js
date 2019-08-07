@@ -27,7 +27,7 @@ const authorize = {
                     return next(new common.errors.NoPermissionError({
                         message: common.i18n.t('errors.middleware.auth.publicAPIDisabled.error'),
                         context: common.i18n.t('errors.middleware.auth.publicAPIDisabled.context'),
-                        help: common.i18n.t('errors.middleware.auth.forInformationRead', {url: 'https://docs.ghost.org/api/content/'})
+                        help: common.i18n.t('errors.middleware.auth.forInformationRead', {url: 'https://ghost.org/docs/api/content/'})
                     }));
                 }
 
@@ -66,12 +66,6 @@ const authorize = {
         }));
     },
 
-    /**
-     * @NOTE:
-     *
-     * We don't support admin api keys yet, but we can already use this authorization helper, because
-     * we have not connected authenticating with admin api keys yet. `req.api_key` will be always null.
-     */
     authorizeAdminApi(req, res, next) {
         const hasUser = req.user && req.user.id;
         const hasApiKey = req.api_key && req.api_key.id;

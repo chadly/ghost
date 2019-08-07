@@ -3,11 +3,11 @@
         "appRoot": ".",
         "corePath": "core/",
         "clientAssets": "core/built/assets",
-        "helperTemplates": "core/server/helpers/tpl/",
+        "helperTemplates": "core/frontend/helpers/tpl/",
         "adminViews": "core/server/web/admin/views/",
         "defaultViews": "core/server/views/",
-        "defaultSettings": "core/server/services/settings/",
-        "internalAppPath": "core/server/apps/",
+        "defaultSettings": "core/frontend/services/settings/",
+        "internalAppPath": "core/frontend/apps/",
         "internalStoragePath": "core/server/adapters/storage/",
         "internalSchedulingPath": "core/server/adapters/scheduling/",
         "migrationPath": "core/server/data/migrations",
@@ -33,8 +33,8 @@
             "contentTypes": ["text/csv", "application/csv", "application/octet-stream"]
         },
         "images": {
-            "extensions": [".jpg", ".jpeg", ".gif", ".png", ".svg", ".svgz"],
-            "contentTypes": ["image/jpeg", "image/png", "image/gif", "image/svg+xml"]
+            "extensions": [".jpg", ".jpeg", ".gif", ".png", ".svg", ".svgz", ".ico"],
+            "contentTypes": ["image/jpeg", "image/png", "image/gif", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"]
         },
         "icons": {
             "extensions": [".png", ".ico"],

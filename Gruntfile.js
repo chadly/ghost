@@ -9,7 +9,7 @@
 require('./core/server/overrides');
 
 const config = require('./core/server/config');
-const urlService = require('./core/server/services/url');
+const urlService = require('./core/frontend/services/url');
 const _ = require('lodash');
 const chalk = require('chalk');
 const fs = require('fs-extra');
@@ -70,21 +70,23 @@ const configureGrunt = function (grunt) {
                     'content/themes/casper/assets/js/*.js'
                 ],
                 options: {
-                    livereload: true
+                    livereload: true,
+                    interval: 500
                 }
             },
             express: {
                 files: [
                     'core/ghost-server.js',
                     'core/server/**/*.js',
-                    '!core/server/lib/members/static/auth/**/*.js',
+                    'core/frontend/**/*.js',
                     'config.*.json',
                     '!config.testing.json'
                 ],
                 tasks: ['express:dev'],
                 options: {
                     spawn: false,
-                    livereload: true
+                    livereload: true,
+                    interval: 500
                 }
             }
         },
@@ -140,38 +142,6 @@ const configureGrunt = function (grunt) {
             single: {}
         },
 
-        // ### grunt-mocha-istanbul
-        // Configuration for the mocha test coverage generator
-        // `grunt coverage`.
-        mocha_istanbul: {
-            coverage: {
-                // they can also have coverage generated for them & the order doesn't matter
-                src: [
-                    'core/test/unit'
-                ],
-                options: {
-                    mask: '**/*_spec.js',
-                    coverageFolder: 'core/test/coverage/unit',
-                    mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides', '--exit'],
-                    excludes: ['core/client', 'core/server/built']
-                }
-            },
-            coverage_all: {
-                src: [
-                    'core/test/acceptance',
-                    'core/test/regression',
-                    'core/test/unit'
-                ],
-                options: {
-                    coverageFolder: 'core/test/coverage/all',
-                    mask: '**/*_spec.js',
-                    mochaOptions: ['--timeout=15000', '--require', 'core/server/overrides', '--exit'],
-                    excludes: ['core/client', 'core/server/built']
-                }
-
-            }
-        },
-
         bgShell: {
             client: {
                 cmd: function () {
@@ -193,17 +163,11 @@ const configureGrunt = function (grunt) {
                         grunt.log.write(chunk);
                     }
 
-                    if (chunk.indexOf('Build successful') !== -1) {
+                    if (chunk.indexOf('Slowest Nodes') !== -1) {
                         hasBuiltClient = true;
                     }
                 },
                 stderr: function (chunk) {
-                    // ember-data 3.6.0-3.7.0 outputs a "Circular dependency" warning which we want to ignore
-                    // TODO: remove after upgrading to ember-data 3.8.0 which already filters the output
-                    if (chunk.indexOf('Circular dependency') > -1) {
-                        return;
-                    }
-
                     hasBuiltClient = true;
                     grunt.log.error(chunk);
                 }
@@ -320,8 +284,7 @@ const configureGrunt = function (grunt) {
                     npmInstall: true
                 },
                 projects: {
-                    'core/client': 'init',
-                    'core/server/lib/members/static/auth': 'init'
+                    'core/client': 'init'
                 }
             },
 
@@ -330,14 +293,12 @@ const configureGrunt = function (grunt) {
             },
 
             prod: {
-                'core/client': 'shell:ember:prod',
-                'core/server/lib/members/static/auth': 'shell:preact:prod'
+                'core/client': 'shell:ember:prod'
             },
 
             watch: {
                 projects: {
-                    'core/client': ['shell:ember:watch', '--live-reload-base-url="' + urlService.utils.getSubdir() + '/ghost/"'],
-                    'core/server/lib/members/static/auth': ['shell:preact:dev']
+                    'core/client': ['shell:ember:watch', '--live-reload-base-url="' + urlService.utils.getSubdir() + '/ghost/"']
                 }
             }
         },
@@ -372,7 +333,7 @@ const configureGrunt = function (grunt) {
     // * [Building assets](#building%20assets):
     //     `grunt init`, `grunt` & `grunt prod` or live reload with `grunt dev`
     // * [Testing](#testing):
-    //     `grunt validate`, the `grunt test-*` sub-tasks or generate a coverage report with `grunt coverage`.
+    //     `grunt validate`, the `grunt test-*` sub-tasks.
 
     // ### Help
     // Run `grunt help` on the commandline to get a print out of the available tasks and details of
@@ -382,27 +343,6 @@ const configureGrunt = function (grunt) {
         function () {
             grunt.log.writeln('Type `grunt --help` to get the details of available grunt tasks.');
         });
-
-    // ### Documentation
-    // Run `grunt docs` to generate annotated source code using the documentation described in the code comments.
-    grunt.registerTask('docs', 'Generate Docs', ['docker']);
-
-    // Run `grunt watch-docs` to setup livereload & watch whilst you're editing the docs
-    grunt.registerTask('watch-docs', function () {
-        grunt.config.merge({
-            watch: {
-                docs: {
-                    files: ['core/server/**/*', 'index.js', 'Gruntfile.js'],
-                    tasks: ['docker'],
-                    options: {
-                        livereload: true
-                    }
-                }
-            }
-        });
-
-        grunt.task.run('watch:docs');
-    });
 
     // ## Testing
 
@@ -473,12 +413,8 @@ const configureGrunt = function (grunt) {
     // **Main testing task**
     //
     // `grunt validate` will either run all tests or run linting
-    // `grunt validate` is called by `npm test` and is used by Travis.
-    grunt.registerTask('validate', 'Run tests or lint code', function () {
-        if (process.env.TEST_SUITE === 'lint') {
-            return grunt.task.run(['lint']);
-        }
-
+    // `grunt validate` is called by `yarn test` and is used by Travis.
+    grunt.registerTask('validate', 'Run tests', function () {
         grunt.task.run(['test-acceptance', 'test-unit']);
     });
 
@@ -512,7 +448,6 @@ const configureGrunt = function (grunt) {
     // Unit tests are run with [mocha](http://mochajs.org/) using
     // [should](https://github.com/visionmedia/should.js) to describe the tests in a highly readable style.
     // Unit tests do **not** touch the database.
-    // A coverage report can be generated for these tests using the `grunt test-coverage` task.
     grunt.registerTask('test-unit', 'Run unit tests (mocha)',
         ['test-setup', 'mochacli:unit']
     );
@@ -523,16 +458,6 @@ const configureGrunt = function (grunt) {
 
     grunt.registerTask('test-acceptance', 'Run acceptance tests',
         ['test-setup', 'mochacli:acceptance']
-    );
-
-    // ### Coverage
-    // `grunt coverage` will generate a report for the code coverage.
-    grunt.registerTask('coverage', 'Generate unit tests coverage report',
-        ['test-setup', 'mocha_istanbul:coverage']
-    );
-
-    grunt.registerTask('coverage-all', 'Generate full coverage report',
-        ['test-setup', 'mocha_istanbul:coverage_all']
     );
 
     // #### Master Warning *(Utility Task)*
@@ -643,6 +568,7 @@ const configureGrunt = function (grunt) {
     grunt.registerTask('release',
         'Release task - creates a final built zip\n' +
         ' - Do our standard build steps \n' +
+        ' - Run all tests(acceptance + regression + unit) \n' +
         ' - Copy files to release-folder/#/#{version} directory\n' +
         ' - Clean out unnecessary files (travis, .git*, etc)\n' +
         ' - Zip files in release-folder to dist-folder/#{version} directory',
@@ -666,8 +592,14 @@ const configureGrunt = function (grunt) {
                     dest: 'core/server/web/admin/views/default.html'
                 }]
             });
-
-            grunt.task.run(['update_submodules:pinned', 'subgrunt:init', 'clean:built', 'clean:tmp', 'prod', 'clean:release', 'copy:admin_html', 'copy:release', 'compress:release']);
+            if (!grunt.option('skip-tests')) {
+                grunt.task.run(['update_submodules:pinned', 'subgrunt:init', 'test-all', 'clean:built', 'clean:tmp', 'prod', 'clean:release', 'copy:admin_html', 'copy:release', 'compress:release']);
+            } else {
+                grunt.log.writeln(chalk.red(
+                    chalk.bold('Skipping tests...')
+                ));
+                grunt.task.run(['update_submodules:pinned', 'subgrunt:init', 'clean:built', 'clean:tmp', 'prod', 'clean:release', 'copy:admin_html', 'copy:release', 'compress:release']);
+            }
         }
     );
 };
