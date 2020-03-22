@@ -13,7 +13,7 @@ const _ = require('lodash'),
     activeStates = ['active', 'warn-1', 'warn-2', 'warn-3', 'warn-4'],
     /**
      * inactive: owner user before blog setup, suspended users
-     * locked user: imported users, they get a random passport
+     * locked user: imported users, they get a random password
      */
     inactiveStates = ['inactive', 'locked'],
     allStates = activeStates.concat(inactiveStates);
@@ -215,26 +215,6 @@ User = ghostBookshelf.Model.extend({
 
         // remove password hash for security reasons
         delete attrs.password;
-        delete attrs.ghost_auth_access_token;
-
-        // NOTE: We don't expose the email address for for external, app and public context.
-        // @TODO: Why? External+Public is actually the same context? Was also mentioned here https://github.com/TryGhost/Ghost/issues/9043
-        // @TODO: move to api serialization when we drop v0.1
-        if (!options || !options.context || (!options.context.user && !options.context.internal && (!options.context.api_key || options.context.api_key.type === 'content'))) {
-            delete attrs.email;
-        }
-
-        // @TODO remove this when we remove v0.1 API as its handled in serialization for v2
-        // We don't expose these fields when fetching data via the public API.
-        if (options && options.context && options.context.public) {
-            delete attrs.created_at;
-            delete attrs.created_by;
-            delete attrs.updated_at;
-            delete attrs.updated_by;
-            delete attrs.last_seen;
-            delete attrs.status;
-            delete attrs.ghost_auth_id;
-        }
 
         return attrs;
     },
@@ -255,7 +235,7 @@ User = ghostBookshelf.Model.extend({
     },
 
     sessions: function sessions() {
-        return this.hasMany('Sessions');
+        return this.hasMany('Session');
     },
 
     roles: function roles() {
@@ -322,6 +302,24 @@ User = ghostBookshelf.Model.extend({
         delete options.status;
 
         return filter;
+    },
+
+    getAction(event, options) {
+        const actor = this.getActor(options);
+
+        // @NOTE: we ignore internal updates (`options.context.internal`) for now
+        if (!actor) {
+            return;
+        }
+
+        // @TODO: implement context
+        return {
+            event: event,
+            resource_id: this.id || this.previous('id'),
+            resource_type: 'user',
+            actor_id: actor.id,
+            actor_type: actor.type
+        };
     }
 }, {
     orderDefaultOptions: function orderDefaultOptions() {
@@ -866,31 +864,36 @@ User = ghostBookshelf.Model.extend({
      * @param {Object} object
      * @param {Object} unfilteredOptions
      */
-    changePassword: function changePassword(object, unfilteredOptions) {
-        var options = this.filterOptions(unfilteredOptions, 'changePassword'),
-            self = this,
-            newPassword = object.newPassword,
-            userId = object.user_id,
-            oldPassword = object.oldPassword,
-            isLoggedInUser = userId === options.context.user,
-            user;
+    changePassword: async function changePassword(object, unfilteredOptions) {
+        const options = this.filterOptions(unfilteredOptions, 'changePassword');
+        const newPassword = object.newPassword;
+        const userId = object.user_id;
+        const oldPassword = object.oldPassword;
+        const isLoggedInUser = userId === options.context.user;
+        const skipSessionID = unfilteredOptions.skipSessionID;
 
         options.require = true;
+        options.withRelated = ['sessions'];
 
-        return self.forge({id: userId}).fetch(options)
-            .then(function then(_user) {
-                user = _user;
+        const user = await this.forge({id: userId}).fetch(options);
 
-                if (isLoggedInUser) {
-                    return self.isPasswordCorrect({
-                        plainPassword: oldPassword,
-                        hashedPassword: user.get('password')
-                    });
-                }
-            })
-            .then(function then() {
-                return user.save({password: newPassword});
+        if (isLoggedInUser) {
+            await this.isPasswordCorrect({
+                plainPassword: oldPassword,
+                hashedPassword: user.get('password')
             });
+        }
+
+        const updatedUser = await user.save({password: newPassword});
+
+        const sessions = user.related('sessions');
+        for (const session of sessions) {
+            if (session.get('session_id') !== skipSessionID) {
+                await session.destroy(options);
+            }
+        }
+
+        return updatedUser;
     },
 
     transferOwnership: function transferOwnership(object, unfilteredOptions) {

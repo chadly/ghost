@@ -22,6 +22,22 @@ function schemaImageObject(metaDataVal) {
     return imageObject;
 }
 
+function schemaPublisherObject(metaDataVal) {
+    var publisherObject;
+
+    publisherObject = {
+        '@type': 'Organization',
+        name: escapeExpression(metaDataVal.site.title),
+        url: metaDataVal.site.url || null,
+        logo: {
+            '@type': 'ImageObject',
+            url: schemaImageObject(metaDataVal.site.logo) || null
+        }
+    };
+
+    return publisherObject;
+}
+
 // Creates the final schema object with values that are not null
 function trimSchema(schema) {
     var schemaObject = {};
@@ -74,11 +90,7 @@ function getPostSchema(metaData, data) {
     schema = {
         '@context': 'https://schema.org',
         '@type': 'Article',
-        publisher: {
-            '@type': 'Organization',
-            name: escapeExpression(metaData.blog.title),
-            logo: schemaImageObject(metaData.blog.logo) || null
-        },
+        publisher: schemaPublisherObject(metaData),
         author: {
             '@type': 'Person',
             name: escapeExpression(data[context].primary_author.name),
@@ -99,7 +111,7 @@ function getPostSchema(metaData, data) {
         description: description,
         mainEntityOfPage: {
             '@type': 'WebPage',
-            '@id': metaData.blog.url || null
+            '@id': metaData.site.url || null
         }
     };
     schema.author = trimSchema(schema.author);
@@ -110,16 +122,12 @@ function getHomeSchema(metaData) {
     var schema = {
         '@context': 'https://schema.org',
         '@type': 'WebSite',
-        publisher: {
-            '@type': 'Organization',
-            name: escapeExpression(metaData.blog.title),
-            logo: schemaImageObject(metaData.blog.logo) || null
-        },
+        publisher: schemaPublisherObject(metaData),
         url: metaData.url,
         image: schemaImageObject(metaData.coverImage),
         mainEntityOfPage: {
             '@type': 'WebPage',
-            '@id': metaData.blog.url || null
+            '@id': metaData.site.url || null
         },
         description: metaData.metaDescription ?
             escapeExpression(metaData.metaDescription) :
@@ -132,17 +140,13 @@ function getTagSchema(metaData, data) {
     var schema = {
         '@context': 'https://schema.org',
         '@type': 'Series',
-        publisher: {
-            '@type': 'Organization',
-            name: escapeExpression(metaData.blog.title),
-            logo: schemaImageObject(metaData.blog.logo) || null
-        },
+        publisher: schemaPublisherObject(metaData),
         url: metaData.url,
         image: schemaImageObject(metaData.coverImage),
         name: data.tag.name,
         mainEntityOfPage: {
             '@type': 'WebPage',
-            '@id': metaData.blog.url || null
+            '@id': metaData.site.url || null
         },
         description: metaData.metaDescription ?
             escapeExpression(metaData.metaDescription) :
@@ -162,7 +166,7 @@ function getAuthorSchema(metaData, data) {
         image: schemaImageObject(metaData.coverImage),
         mainEntityOfPage: {
             '@type': 'WebPage',
-            '@id': metaData.blog.url || null
+            '@id': metaData.site.url || null
         },
         description: metaData.metaDescription ?
             escapeExpression(metaData.metaDescription) :

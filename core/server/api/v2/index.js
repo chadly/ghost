@@ -23,6 +23,10 @@ module.exports = {
         return require('./session');
     },
 
+    get schedules() {
+        return shared.pipeline(require('./schedules'), localUtils);
+    },
+
     get pages() {
         return shared.pipeline(require('./pages'), localUtils);
     },
@@ -61,14 +65,6 @@ module.exports = {
 
     get settings() {
         return shared.pipeline(require('./settings'), localUtils);
-    },
-
-    get subscribers() {
-        return shared.pipeline(require('./subscribers'), localUtils);
-    },
-
-    get members() {
-        return shared.pipeline(require('./members'), localUtils);
     },
 
     get images() {

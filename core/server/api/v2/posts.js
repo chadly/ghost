@@ -2,7 +2,7 @@ const models = require('../../models');
 const common = require('../../lib/common');
 const urlUtils = require('../../lib/url-utils');
 const allowedIncludes = ['tags', 'authors', 'authors.roles'];
-const unsafeAttrs = ['status', 'authors'];
+const unsafeAttrs = ['status', 'authors', 'visibility'];
 
 module.exports = {
     docName: 'posts',
@@ -42,7 +42,10 @@ module.exports = {
             'fields',
             'formats',
             'debug',
-            'absolute_urls'
+            'absolute_urls',
+            // NOTE: only for internal context
+            'forUpdate',
+            'transacting'
         ],
         data: [
             'id',
@@ -115,7 +118,10 @@ module.exports = {
         options: [
             'include',
             'id',
-            'source'
+            'source',
+            // NOTE: only for internal context
+            'forUpdate',
+            'transacting'
         ],
         validation: {
             options: {

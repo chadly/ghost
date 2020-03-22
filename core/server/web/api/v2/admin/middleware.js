@@ -19,9 +19,10 @@ const notImplemented = function (req, res, next) {
         tags: ['GET', 'PUT', 'DELETE', 'POST'],
         users: ['GET'],
         themes: ['POST', 'PUT'],
-        subscribers: ['GET', 'PUT', 'DELETE', 'POST'],
         config: ['GET'],
-        webhooks: ['POST', 'DELETE']
+        webhooks: ['POST', 'DELETE'],
+        schedules: ['PUT'],
+        db: ['POST']
     };
 
     const match = req.url.match(/^\/(\w+)\/?/);
@@ -55,15 +56,26 @@ module.exports.authAdminApi = [
 ];
 
 /**
- * Authentication for client endpoints
+ * Authentication for private endpoints with token in URL
+ * Ex.: For scheduler publish endpoint
  */
-module.exports.authenticateClient = function authenticateClient(client) {
-    return [
-        auth.authenticate.authenticateClient,
-        auth.authenticate.authenticateUser,
-        auth.authorize.requiresAuthorizedClient(client),
-        shared.middlewares.api.cors,
-        shared.middlewares.urlRedirects.adminRedirect,
-        shared.middlewares.prettyUrls
-    ];
-};
+module.exports.authAdminApiWithUrl = [
+    auth.authenticate.authenticateAdminApiWithUrl,
+    auth.authorize.authorizeAdminApi,
+    shared.middlewares.updateUserLastSeen,
+    shared.middlewares.api.cors,
+    shared.middlewares.urlRedirects.adminRedirect,
+    shared.middlewares.prettyUrls,
+    notImplemented
+];
+
+/**
+ * Middleware for public admin endpoints
+ */
+module.exports.publicAdminApi = [
+    shared.middlewares.api.cors,
+    shared.middlewares.urlRedirects.adminRedirect,
+    shared.middlewares.prettyUrls,
+    notImplemented
+];
+

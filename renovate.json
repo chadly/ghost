@@ -15,10 +15,18 @@
     "automerge": true
   },
   "ignoreDeps": [
+      "got",
+      "intl-messageformat",
       "moment-timezone",
       "nodemailer",
       "validator",
       "simple-dom"
     ],
-  "ignorePaths": ["core/test"]
+  "ignorePaths": ["core/test"],
+  "packageRules": [
+    {
+      "packagePatterns": [ "metascraper" ],
+      "groupName": "metascraper"
+    }
+  ]
 }

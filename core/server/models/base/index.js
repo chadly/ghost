@@ -233,35 +233,18 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
             }
         });
 
-        [
-            'fetching',
-            'fetching:collection',
-            'fetched',
-            'fetched:collection',
-            'creating',
-            'created',
-            'updating',
-            'updated',
-            'destroying',
-            'destroyed',
-            'saving',
-            'saved'
-        ].forEach(function (eventName) {
-            var functionName = 'on' + eventName[0].toUpperCase() + eventName.slice(1);
-
-            if (functionName.indexOf(':') !== -1) {
-                functionName = functionName.slice(0, functionName.indexOf(':'))
-                    + functionName[functionName.indexOf(':') + 1].toUpperCase()
-                    + functionName.slice(functionName.indexOf(':') + 2);
-                functionName = functionName.replace(':', '');
-            }
-
-            if (!self[functionName]) {
-                return;
-            }
-
-            self.on(eventName, self[functionName]);
-        });
+        self.on('fetched', self.onFetched);
+        self.on('fetching', self.onFetching);
+        self.on('fetched:collection', self.onFetchedCollection);
+        self.on('fetching:collection', self.onFetchingCollection);
+        self.on('creating', self.onCreating);
+        self.on('created', self.onCreated);
+        self.on('updating', self.onUpdating);
+        self.on('updated', self.onUpdated);
+        self.on('destroying', self.onDestroying);
+        self.on('destroyed', self.onDestroyed);
+        self.on('saving', self.onSaving);
+        self.on('saved', self.onSaved);
 
         // @NOTE: Please keep here. If we don't initialize the parent, bookshelf-relations won't work.
         proto.initialize.call(this);
@@ -276,6 +259,8 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         return validation.validateSchema(this.tableName, this, options);
     },
 
+    onFetched() {},
+
     /**
      * http://knexjs.org/#Builder-forUpdate
      * https://dev.mysql.com/doc/refman/5.7/en/innodb-locking-reads.html
@@ -289,18 +274,17 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         }
     },
 
+    onFetchedCollection() {},
+
     onFetchingCollection: function onFetchingCollection(model, columns, options) {
         if (options.forUpdate && options.transacting) {
             options.query.forUpdate();
         }
     },
 
-    onSaving: function onSaving() {
-        // Remove any properties which don't belong on the model
-        this.attributes = this.pick(this.permittedAttributes());
+    onCreated(model, attrs, options) {
+        addAction(model, 'added', options);
     },
-
-    onDestroying() {},
 
     /**
      * Adding resources implies setting these properties on the server side
@@ -359,6 +343,10 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
             });
     },
 
+    onUpdated(model, attrs, options) {
+        addAction(model, 'edited', options);
+    },
+
     /**
      * Changing resources implies setting these properties on the server side
      * - set `updated_by` based on the context
@@ -413,13 +401,14 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         return Promise.resolve(this.onValidate(model, attr, options));
     },
 
-    onCreated(model, attrs, options) {
-        addAction(model, 'added', options);
+    onSaved() {},
+
+    onSaving: function onSaving() {
+        // Remove any properties which don't belong on the model
+        this.attributes = this.pick(this.permittedAttributes());
     },
 
-    onUpdated(model, attrs, options) {
-        addAction(model, 'edited', options);
-    },
+    onDestroying() {},
 
     onDestroyed(model, options) {
         if (!model._changed) {
@@ -433,8 +422,6 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
 
         addAction(model, 'deleted', options);
     },
-
-    onSaved() {},
 
     /**
      * before we insert dates into the database, we have to normalize
@@ -598,6 +585,15 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         const options = ghostBookshelf.Model.filterOptions(unfilteredOptions, 'toJSON');
         options.omitPivot = true;
 
+        /**
+         * removes null relations coming from `hasOne` - https://bookshelfjs.org/api.html#Model-instance-hasOne
+         * Based on https://github.com/bookshelf/bookshelf/issues/72#issuecomment-25164617
+         */
+        _.each(this.relations, (value, key) => {
+            if (_.isEmpty(value)) {
+                delete this.relations[key];
+            }
+        });
         // CASE: get JSON of previous attrs
         if (options.previous) {
             const clonedModel = _.cloneDeep(this);
@@ -686,11 +682,11 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         case 'edit':
             return baseOptions.concat(extraOptions, ['id', 'require']);
         case 'findOne':
-            return baseOptions.concat(extraOptions, ['columns', 'require']);
+            return baseOptions.concat(extraOptions, ['columns', 'require', 'mongoTransformer']);
         case 'findAll':
-            return baseOptions.concat(extraOptions, ['columns']);
+            return baseOptions.concat(extraOptions, ['filter', 'columns', 'mongoTransformer']);
         case 'findPage':
-            return baseOptions.concat(extraOptions, ['filter', 'order', 'page', 'limit', 'columns']);
+            return baseOptions.concat(extraOptions, ['filter', 'order', 'page', 'limit', 'columns', 'mongoTransformer']);
         default:
             return baseOptions.concat(extraOptions);
         }
@@ -755,7 +751,13 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
             }
 
             if (this.prototype.relationships && this.prototype.relationships.indexOf(property) !== -1) {
-                _.each(data[property], (relation, indexInArr) => {
+                let relations = data[property];
+
+                // CASE: 1:1 relation will have single data point
+                if (!_.isArray(data[property])) {
+                    relations = [data[property]];
+                }
+                _.each(relations, (relation, indexInArr) => {
                     _.each(relation, (value, relationProperty) => {
                         if (value !== null
                             && Object.prototype.hasOwnProperty.call(schema.tables[this.prototype.relationshipBelongsTo[property]], relationProperty)
@@ -911,6 +913,8 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
                 data: data,
                 meta: {pagination: response.pagination}
             };
+        }).catch((err) => {
+            throw err;
         });
     },
 
@@ -1110,8 +1114,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
         }
 
         // Some keywords cannot be changed
-        const slugList = _.union(config.get('slugs').reserved, urlUtils.getProtectedSlugs());
-        slug = _.includes(slugList, slug) ? slug + '-' + baseName : slug;
+        slug = _.includes(urlUtils.getProtectedSlugs(), slug) ? slug + '-' + baseName : slug;
 
         // if slug is empty after trimming use the model name
         if (!slug) {

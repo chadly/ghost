@@ -12,8 +12,10 @@ const allowedKeys = ['ghost-api'];
  * ^0.1.0
  * ^2.0.0
  * 2.0.0
+ * v3
  * v2
  * v0.1
+ * canary
  *
  * Goal: Extract major version from input.
  *
@@ -23,22 +25,25 @@ const allowedKeys = ['ghost-api'];
 module.exports = (packageJson) => {
     let themeEngines = _.cloneDeep(DEFAULTS);
 
-    if (packageJson && packageJson.hasOwnProperty('engines')) {
+    if (packageJson && Object.prototype.hasOwnProperty.call(packageJson, 'engines')) {
         // CASE: validate
         if (packageJson.engines['ghost-api']) {
             const availableApiVersions = {};
-
             config.get('api:versions:all').forEach((version) => {
-                availableApiVersions[semver(semver.coerce(version).version).major] = version;
+                if (version === 'canary') {
+                    availableApiVersions.canary = version;
+                } else {
+                    availableApiVersions[semver.major(semver.coerce(version).version)] = version;
+                }
             });
 
             const apiVersion = packageJson.engines['ghost-api'];
-            const apiVersionMajor = semver(semver.coerce(apiVersion).version).major;
+            const apiVersionMajor = apiVersion === 'canary' ? 'canary' : semver.major(semver.coerce(apiVersion).version);
 
             if (availableApiVersions[apiVersionMajor]) {
                 packageJson.engines['ghost-api'] = availableApiVersions[apiVersionMajor];
             } else {
-                packageJson.engines['ghost-api'] = 'v0.1';
+                packageJson.engines['ghost-api'] = 'v3';
             }
         }
 
