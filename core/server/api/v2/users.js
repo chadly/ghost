@@ -126,8 +126,6 @@ module.exports = {
                 frame.options.transacting = t;
 
                 return Promise.all([
-                    models.Accesstoken.destroyByUser(frame.options),
-                    models.Refreshtoken.destroyByUser(frame.options),
                     models.Post.destroyByAuthor(frame.options)
                 ]).then(() => {
                     return models.User.destroy(Object.assign({status: 'all'}, frame.options));
@@ -157,6 +155,7 @@ module.exports = {
             }
         },
         query(frame) {
+            frame.options.skipSessionID = frame.original.session.id;
             return models.User.changePassword(frame.data.password[0], frame.options);
         }
     },

@@ -43,7 +43,7 @@
                 },
                 "visibility": {
                     "type": ["string", "null"],
-                    "enum": ["public"]
+                    "enum": ["public", "members", "paid"]
                 },
                 "meta_title": {
                     "type": ["string", "null"],
@@ -115,6 +115,12 @@
                     "$ref": "#/definitions/post-tags"
                 },
                 "id": {
+                    "strip": true
+                },
+                "uuid": {
+                    "strip": true
+                },
+                "comment_id": {
                     "strip": true
                 },
                 "author": {

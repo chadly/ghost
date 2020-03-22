@@ -35,10 +35,6 @@ module.exports = {
         return require('./error-handler');
     },
 
-    get frontendClient() {
-        return require('./frontend-client');
-    },
-
     get ghostLocals() {
         return require('./ghost-locals');
     },
@@ -57,6 +53,10 @@ module.exports = {
 
     get prettyUrls() {
         return require('./pretty-urls');
+    },
+
+    get requestId() {
+        return require('./request-id');
     },
 
     get serveFavicon() {

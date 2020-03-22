@@ -114,9 +114,10 @@ const configureGrunt = function (grunt) {
             options: {
                 ui: 'bdd',
                 reporter: grunt.option('reporter') || 'spec',
-                timeout: '30000',
+                timeout: '60000',
                 save: grunt.option('reporter-output'),
                 require: ['core/server/overrides'],
+                retries: '3',
                 exit: true
             },
 
@@ -168,8 +169,22 @@ const configureGrunt = function (grunt) {
                     }
                 },
                 stderr: function (chunk) {
-                    hasBuiltClient = true;
-                    grunt.log.error(chunk);
+                    const skipFilter = grunt.option('client') ? false : [
+                        /- building/
+                    ].some(function (regexp) {
+                        return regexp.test(chunk);
+                    });
+
+                    const errorFilter = grunt.option('client') ? false : [
+                        /^>>/
+                    ].some(function (regexp) {
+                        return regexp.test(chunk);
+                    });
+
+                    if (!skipFilter) {
+                        hasBuiltClient = errorFilter ? hasBuiltClient : true;
+                        grunt.log.error(chunk);
+                    }
                 }
             }
         },
@@ -255,7 +270,7 @@ const configureGrunt = function (grunt) {
                     sourceMap: false
                 },
                 files: {
-                    'core/server/public/ghost-sdk.min.js': 'core/server/public/ghost-sdk.js'
+                    'core/server/public/members.min.js': 'core/server/public/members.js'
                 }
             }
         },
@@ -358,7 +373,7 @@ const configureGrunt = function (grunt) {
     grunt.registerTask('setTestEnv',
         'Use "testing" Ghost config; unless we are running on travis (then show queries for debugging)',
         function () {
-            process.env.NODE_ENV = process.env.TRAVIS ? process.env.NODE_ENV : 'testing';
+            process.env.NODE_ENV = process.env.NODE_ENV || 'testing';
             cfg.express.test.options.node_env = process.env.NODE_ENV;
         });
 

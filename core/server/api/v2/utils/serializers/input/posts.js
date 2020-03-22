@@ -1,23 +1,30 @@
 const _ = require('lodash');
+const mapNQLKeyValues = require('../../../../../../shared/nql-map-key-values');
 const debug = require('ghost-ignition').debug('api:v2:utils:serializers:input:posts');
 const url = require('./utils/url');
 const localUtils = require('../../index');
-const labs = require('../../../../../services/labs');
 const converters = require('../../../../../lib/mobiledoc/converters');
+const postsMetaSchema = require('../../../../../data/schema').tables.posts_meta;
+
+const replacePageWithType = mapNQLKeyValues({
+    key: {
+        from: 'page',
+        to: 'type'
+    },
+    values: [{
+        from: false,
+        to: 'post'
+    }, {
+        from: true,
+        to: 'page'
+    }]
+});
 
 function removeMobiledocFormat(frame) {
     if (frame.options.formats && frame.options.formats.includes('mobiledoc')) {
         frame.options.formats = frame.options.formats.filter((format) => {
             return (format !== 'mobiledoc');
         });
-    }
-}
-
-function includeTags(frame) {
-    if (!frame.options.withRelated) {
-        frame.options.withRelated = ['tags'];
-    } else if (!frame.options.withRelated.includes('tags')) {
-        frame.options.withRelated.push('tags');
     }
 }
 
@@ -46,12 +53,24 @@ function setDefaultOrder(frame) {
     }
 }
 
+function forceVisibilityColumn(frame) {
+    if (frame.options.columns && !frame.options.columns.includes('visibility')) {
+        frame.options.columns.push('visibility');
+    }
+}
+
 function defaultFormat(frame) {
     if (frame.options.formats) {
         return;
     }
 
     frame.options.formats = 'mobiledoc';
+}
+
+function handlePostsMeta(frame) {
+    let metaAttrs = _.keys(_.omit(postsMetaSchema, ['id', 'post_id']));
+    let meta = _.pick(frame.data.posts[0], metaAttrs);
+    frame.data.posts[0].posts_meta = meta;
 }
 
 /**
@@ -64,9 +83,9 @@ function defaultFormat(frame) {
  */
 const forcePageFilter = (frame) => {
     if (frame.options.filter) {
-        frame.options.filter = `(${frame.options.filter})+page:false`;
+        frame.options.filter = `(${frame.options.filter})+type:post`;
     } else {
-        frame.options.filter = 'page:false';
+        frame.options.filter = 'type:post';
     }
 };
 
@@ -94,12 +113,8 @@ module.exports = {
             // CASE: the content api endpoint for posts should not return mobiledoc
             removeMobiledocFormat(frame);
 
-            // CASE: Members needs to have the tags to check if its allowed access
-            if (labs.isSet('members')) {
-                includeTags(frame);
-            }
-
             setDefaultOrder(frame);
+            forceVisibilityColumn(frame);
         }
 
         if (!localUtils.isContentAPI(frame)) {
@@ -108,7 +123,7 @@ module.exports = {
             defaultRelations(frame);
         }
 
-        debug(frame.options);
+        frame.options.mongoTransformer = replacePageWithType;
     },
 
     read(apiConfig, frame) {
@@ -126,12 +141,8 @@ module.exports = {
             // CASE: the content api endpoint for posts should not return mobiledoc
             removeMobiledocFormat(frame);
 
-            if (labs.isSet('members')) {
-                // CASE: Members needs to have the tags to check if its allowed access
-                includeTags(frame);
-            }
-
             setDefaultOrder(frame);
+            forceVisibilityColumn(frame);
         }
 
         if (!localUtils.isContentAPI(frame)) {
@@ -139,8 +150,6 @@ module.exports = {
             defaultFormat(frame);
             defaultRelations(frame);
         }
-
-        debug(frame.options);
     },
 
     add(apiConfig, frame, options = {add: true}) {
@@ -158,7 +167,7 @@ module.exports = {
 
         // @NOTE: force adding post
         if (options.add) {
-            frame.data.posts[0].page = false;
+            frame.data.posts[0].type = 'post';
         }
 
         // CASE: Transform short to long format
@@ -182,21 +191,25 @@ module.exports = {
             });
         }
 
+        handlePostsMeta(frame);
         defaultFormat(frame);
         defaultRelations(frame);
     },
 
     edit(apiConfig, frame) {
+        debug('edit');
         this.add(apiConfig, frame, {add: false});
 
+        handlePostsMeta(frame);
         forceStatusFilter(frame);
         forcePageFilter(frame);
     },
 
     destroy(apiConfig, frame) {
+        debug('destroy');
         frame.options.destroyBy = {
             id: frame.options.id,
-            page: false
+            type: 'post'
         };
 
         defaultFormat(frame);
