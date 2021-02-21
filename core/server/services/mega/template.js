@@ -1,5 +1,6 @@
 /* eslint indent: warn, no-irregular-whitespace: warn */
-module.exports = ({post, site}) => {
+const iff = (cond, yes, no) => (cond ? yes : no);
+module.exports = ({post, site, templateSettings}) => {
     const date = new Date();
     return `<!doctype html>
 <html>
@@ -62,7 +63,6 @@ table td {
     margin: 0 auto !important;
     /* makes it centered */
     max-width: 600px;
-    width: 600px;
 }
 
 /* This should also be a block element, so that it will fill 100% of the .container */
@@ -145,17 +145,16 @@ dd {
 blockquote {
     margin: 2em 0;
     padding: 0 25px 0 25px;
-    border-left: #15212A 2px solid;
-    font-style: italic;
-    font-size: 20px;
-    line-height: 1.75em;
+    border-left: ${templateSettings.accentColor || '#15212A'} 2px solid;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.6em;
     letter-spacing: -0.2px;
 }
 
 blockquote p {
     margin: 0.8em 0;
-    font-size: 1.2em;
-    font-weight: 300;
+    font-size: 1em;
 }
 
 blockquote small {
@@ -347,7 +346,17 @@ figure blockquote p {
     border-bottom: 1px solid #e5eff5;
 }
 
-.post-content a {
+.post-content-sans-serif {
+    max-width: 600px !important;
+    font-size: 17px;
+    line-height: 1.5em;
+    color: #23323D;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5eff5;
+}
+
+.post-content a,
+.post-content-sans-serif a {
     color: #08121A;
     text-decoration: underline;
 }
@@ -368,6 +377,7 @@ figure blockquote p {
 .kg-image-card img {
     display: block;
     margin: 0 auto;
+    height: auto !important;
 }
 
 .kg-bookmark-container {
@@ -381,7 +391,8 @@ figure blockquote p {
 }
 
 .kg-bookmark-content {
-    flex-grow: 1;
+    display: inline-block;
+    width: 100%;
     padding: 20px;
 }
 
@@ -407,21 +418,16 @@ figure blockquote p {
 }
 
 .kg-bookmark-thumbnail {
-    position: relative;
     min-width: 140px;
     max-width: 180px;
-    max-height: 100%;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    border-radius: 0 2px 2px 0;
 }
 
 .kg-bookmark-thumbnail img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 0 3px 3px 0;
-
-    object-fit: cover;
+    display: none;
 }
 
 .kg-bookmark-metadata {
@@ -444,17 +450,17 @@ figure blockquote p {
     line-height: 1.5em;
 }
 
-.kg-bookmark-author:after {
-    content: "•";
-    margin: 0 6px;
-}
-
 .kg-bookmark-publisher {
     overflow: hidden;
     max-width: 240px;
     line-height: 1.5em;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.kg-bookmark-publisher:before {
+    content: "•";
+    margin: 0 6px;
 }
 
 .kg-gallery-container {
@@ -465,6 +471,36 @@ figure blockquote p {
     width: 100% !important;
     height: auto !important;
     padding-top: 20px;
+}
+
+.kg-video-preview {
+    background-color: #1d1f21;
+    background-image: radial-gradient(circle at center, #5b5f66, #1d1f21);
+    display: block;
+    text-decoration: none !important;
+}
+.kg-video-preview table {
+    background-size: cover;
+    min-height: 200px; /* for when images aren't loaded */
+}
+.kg-video-play-button {
+    height: 2em;
+    width: 3em;
+    margin: 0 auto;
+    border-radius: 10px;
+    padding: 1em 0.8em 0.6em 1em;
+    font-size: 1em; /* change this to resize */
+    background-color: rgba(0,0,0,0.85);
+}
+.kg-video-play-button div {
+    display: block;
+    width: 0;
+    height: 0;
+    margin: 0 auto;
+    line-height: 0px; /* fix for Yahoo Mail */
+    border-color: transparent transparent transparent white;
+    border-style: solid;
+    border-width: 0.8em 0 0.8em 1.5em;
 }
 
 
@@ -492,8 +528,16 @@ figure blockquote p {
     margin-top: 20px;
     text-align: center;
     font-size: 13px;
-    padding-bottom: 40px;
-    padding-top: 50px;
+    padding-bottom: 10px;
+    padding-top: 10px;
+    padding-left: 30px;
+    padding-right: 30px;
+    line-height: 1.5em;
+}
+
+.footer a {
+    color: #738a94;
+    text-decoration: underline;
 }
 
 /* -------------------------------------
@@ -597,148 +641,148 @@ figure blockquote p {
 ------------------------------------- */
 @media only screen and (max-width: 620px) {
 
-    table[class=body] {
+    table.body {
         width: 100%;
         min-width: 100%;
     }
 
-    table[class=body] p,
-    table[class=body] ul,
-    table[class=body] ol,
-    table[class=body] td,
-    table[class=body] span {
+    table.body p,
+    table.body ul,
+    table.body ol,
+    table.body td,
+    table.body span {
         font-size: 16px !important;
     }
 
-    table[class=body] pre {
+    table.body pre {
         white-space: pre-wrap !important;
         word-break: break-word !important;
     }
 
-    table[class=body] .wrapper,
-    table[class=body] .article {
+    table.body .wrapper,
+    table.body .article {
         padding: 0 10px !important;
     }
 
-    table[class=body] .content {
+    table.body .content {
         padding: 0 !important;
     }
 
-    table[class=body] .container {
+    table.body .container {
         padding: 0 !important;
         width: 100% !important;
     }
 
-    table[class=body] .main {
+    table.body .main {
         border-left-width: 0 !important;
         border-radius: 0 !important;
         border-right-width: 0 !important;
     }
 
-    table[class=body] .btn table {
+    table.body .btn table {
         width: 100% !important;
     }
 
-    table[class=body] .btn a {
+    table.body .btn a {
         width: 100% !important;
     }
 
-    table[class=body] .img-responsive {
+    table.body .img-responsive {
         height: auto !important;
         max-width: 100% !important;
         width: auto !important;
     }
 
-    table[class=body] .site-icon img {
+    table.body .site-icon img {
         width: 40px !important;
         height: 40px !important;
     }
 
-    table[class=body] .site-url a {
+    table.body .site-url a {
         font-size: 14px !important;
         padding-bottom: 15px !important;
     }
 
-    table[class=body] .post-meta {
+    table.body .post-meta {
         white-space: normal !important;
         font-size: 12px !important;
         line-height: 1.5em;
     }
 
-    table[class=body] .view-online-link,
-    table[class=body] .footer,
-    table[class=body] .footer a {
+    table.body .view-online-link,
+    table.body .footer,
+    table.body .footer a {
         font-size: 12px !important;
     }
 
-    table[class=body] .post-title a {
+    table.body .post-title a {
         font-size: 32px !important;
         line-height: 1.15em !important;
     }
 
-    table[class=body] .kg-bookmark-card {
+    table.body .kg-bookmark-card {
         width: 90vw !important;
     }
 
-    table[class=body] .kg-bookmark-thumbnail {
+    table.body .kg-bookmark-thumbnail {
         display: none !important;
     }
-    
-    table[class=body] .kg-bookmark-metadata span {
+
+    table.body .kg-bookmark-metadata span {
         font-size: 13px !important;
     }
 
-    table[class=body] .kg-embed-card {
+    table.body .kg-embed-card {
         max-width: 90vw !important;
     }
 
-    table[class=body] h1 {
+    table.body h1 {
         font-size: 32px !important;
         line-height: 1.3em !important;
     }
 
-    table[class=body] h2 {
+    table.body h2 {
         font-size: 26px !important;
         line-height: 1.22em !important;
     }
 
-    table[class=body] h3 {
+    table.body h3 {
         font-size: 21px !important;
         line-height: 1.25em !important;
     }
 
-    table[class=body] h4 {
+    table.body h4 {
         font-size: 19px !important;
         line-height: 1.3em !important;
     }
 
-    table[class=body] h5 {
+    table.body h5 {
         font-size: 16px !important;
         line-height: 1.4em !important;
     }
 
-    table[class=body] h6 {
+    table.body h6 {
         font-size: 16px !important;
         line-height: 1.4em !important;
     }
 
-    table[class=body] blockquote {
+    table.body blockquote {
         font-size: 17px !important;
         line-height: 1.6em !important;
         margin-bottom: 0 !important;
         padding-left: 15px !important;
     }
 
-    table[class=body] blockquote + * {
+    table.body blockquote + * {
         margin-top: 1.5em !important;
     }
-    
-    table[class=body] hr {
+
+    table.body hr {
         margin: 2em 0 !important;
     }
 
-    table[class=body] figcaption,
-    table[class=body] figcaption a {
+    table.body figcaption,
+    table.body figcaption a {
         font-size: 13px !important;
     }
 
@@ -788,12 +832,38 @@ figure blockquote p {
         border-color: #34495e !important;
     }
 }
+
+
+${ templateSettings.showBadge ? `
+.footer-powered {
+    text-align: center;
+    padding-top: 70px;
+    padding-bottom: 40px;
+}
+
+.gh-powered {
+    width: 142px;
+    height: 30px;
+}
+` : ''}
+
+/* ----- ENDIF THE BROWSER ----- */
+
 </style>
 </head>
 
 <body class="">
     <span class="preheader">${ post.excerpt ? post.excerpt : `${post.title} – ` }</span>
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" class="body" width="100%">
+
+        <!-- Outlook doesn't respect max-width so we need an extra centered table -->
+        <!--[if mso]>
+        <tr>
+            <td>
+                <center>
+                    <table border="0" cellpadding="0" cellspacing="0" width="600">
+        <![endif]-->
+
         <tr>
             <td>&nbsp;</td>
             <td class="container">
@@ -806,12 +876,15 @@ figure blockquote p {
                         <tr>
                             <td class="wrapper">
                                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+
+
+                                    ${ templateSettings.showSiteHeader ? `
                                     <tr>
                                         <td class="site-info" width="100%" align="center">
                                             <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                                                ${ site.icon ? `
+                                                ${ site.iconUrl ? `
                                                 <tr>
-                                                    <td class="site-icon"><a href="${site.url}"><img src="${site.url}${site.icon}" border="0"></a></td>
+                                                    <td class="site-icon"><a href="${site.url}"><img src="${site.iconUrl}" border="0"></a></td>
                                                 </tr>
                                                 ` : ``}
                                                 <tr>
@@ -820,6 +893,9 @@ figure blockquote p {
                                             </table>
                                         </td>
                                     </tr>
+                                    ` : ''}
+
+
                                     <tr>
                                         <td class="post-title"><a href="${post.url}" class="post-title-link">${post.title}</a></td>
                                     </tr>
@@ -828,8 +904,8 @@ figure blockquote p {
                                             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                                                 <tr>
                                                     <td class="post-meta">
-                                                        By ${post.authors} – 
-                                                        ${post.published_at} – 
+                                                        By ${post.authors} –
+                                                        ${post.published_at} –
                                                         <a href="${post.url}" class="view-online-link">View online →</a>
                                                     </td>
                                                 </tr>
@@ -842,11 +918,10 @@ figure blockquote p {
                                     </tr>
                                     ` : ``}
                                     <tr>
-                                        <td class="post-content">
+                                        <td class="${(templateSettings.bodyFontCategory === 'sans_serif') ? `post-content-sans-serif` : `post-content` }">
                                             <!-- POST CONTENT START -->
                                             ${post.html}
                                             <!-- POST CONTENT END -->
-
                                         </td>
                                     </tr>
                                 </table>
@@ -857,10 +932,17 @@ figure blockquote p {
 
                         <tr>
                             <td class="wrapper" align="center">
-                                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="padding-top: 40px; padding-bottom: 30px;">
+                                    ${iff(!!templateSettings.footerContent, `<tr><td class="footer">${templateSettings.footerContent}</td></tr>`, '')}
                                     <tr>
                                         <td class="footer">${site.title} &copy; ${date.getFullYear()} – <a href="%recipient.unsubscribe_url%">Unsubscribe</a></td>
                                     </tr>
+
+                                    ${ templateSettings.showBadge ? `
+                                    <tr>
+                                        <td class="footer-powered"><a href="https://ghost.org/"><img src="https://static.ghost.org/v3.0.0/images/powered.png" border="0" width="142" height="30" class="gh-powered" alt="Publish with Ghost"></a></td>
+                                    </tr>
+                                    ` : '' }
                                 </table>
                             </td>
                         </tr>
@@ -871,6 +953,14 @@ figure blockquote p {
             </td>
             <td>&nbsp;</td>
         </tr>
+
+    <!--[if mso]>
+                    </table>
+                </center>
+            </td>
+        </tr>
+    <![endif]-->
+
     </table>
 </body>
 

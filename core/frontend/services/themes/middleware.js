@@ -1,8 +1,9 @@
 const _ = require('lodash');
 const hbs = require('./engine');
-const urlUtils = require('../../../server/lib/url-utils');
-const config = require('../../../server/config');
-const common = require('../../../server/lib/common');
+const urlUtils = require('../../../shared/url-utils');
+const config = require('../../../shared/config');
+const {i18n} = require('../proxy');
+const errors = require('@tryghost/errors');
 const settingsCache = require('../../../server/services/settings/cache');
 const labs = require('../../../server/services/labs');
 const activeTheme = require('./active');
@@ -15,19 +16,19 @@ function ensureActiveTheme(req, res, next) {
     // CASE: this means that the theme hasn't been loaded yet i.e. there is no active theme
     if (!activeTheme.get()) {
         // This is the one place we ACTUALLY throw an error for a missing theme as it's a request we cannot serve
-        return next(new common.errors.InternalServerError({
+        return next(new errors.InternalServerError({
             // We use the settingsCache here, because the setting will be set,
             // even if the theme itself is not usable because it is invalid or missing.
-            message: common.i18n.t('errors.middleware.themehandler.missingTheme', {theme: settingsCache.get('active_theme')})
+            message: i18n.t('errors.middleware.themehandler.missingTheme', {theme: settingsCache.get('active_theme')})
         }));
     }
 
     // CASE: bootstrap theme validation failed, we would like to show the errors on the site [only production]
     if (activeTheme.get().error && config.get('env') === 'production') {
-        return next(new common.errors.InternalServerError({
+        return next(new errors.InternalServerError({
             // We use the settingsCache here, because the setting will be set,
             // even if the theme itself is not usable because it is invalid or missing.
-            message: common.i18n.t('errors.middleware.themehandler.invalidTheme', {theme: settingsCache.get('active_theme')}),
+            message: i18n.t('errors.middleware.themehandler.invalidTheme', {theme: settingsCache.get('active_theme')}),
             errorDetails: activeTheme.get().error.errorDetails
         }));
     }
@@ -51,7 +52,8 @@ function haxGetMembersPriceData() {
         AUD: '$',
         CAD: '$',
         GBP: '£',
-        EUR: '€'
+        EUR: '€',
+        INR: '₹'
     };
     const defaultPriceData = {
         monthly: 0,
@@ -59,12 +61,9 @@ function haxGetMembersPriceData() {
     };
 
     try {
-        const membersSettings = settingsCache.get('members_subscription_settings');
-        const stripeProcessor = membersSettings.paymentProcessors.find(
-            processor => processor.adapter === 'stripe'
-        );
+        const stripePlans = settingsCache.get('stripe_plans');
 
-        const priceData = stripeProcessor.config.plans.reduce((prices, plan) => {
+        const priceData = stripePlans.reduce((prices, plan) => {
             const numberAmount = 0 + plan.amount;
             const dollarAmount = numberAmount ? Math.round(numberAmount / 100) : 0;
             return Object.assign(prices, {
@@ -72,8 +71,8 @@ function haxGetMembersPriceData() {
             });
         }, {});
 
-        priceData.currency = String.prototype.toUpperCase.call(stripeProcessor.config.currency || 'usd');
-        priceData.currency_symbol = CURRENCY_SYMBOLS[priceData.currency];
+        priceData.currency = stripePlans[0].currency;
+        priceData.currency_symbol = CURRENCY_SYMBOLS[priceData.currency.toUpperCase()];
 
         if (Number.isInteger(priceData.monthly) && Number.isInteger(priceData.yearly)) {
             return priceData;
@@ -134,7 +133,9 @@ function updateLocalTemplateOptions(req, res, next) {
         firstname: req.member.name && req.member.name.split(' ')[0],
         avatar_image: req.member.avatar_image,
         subscriptions: req.member.stripe.subscriptions,
-        paid: req.member.stripe.subscriptions.length !== 0
+        paid: req.member.stripe.subscriptions.filter((subscription) => {
+            return ['active', 'trialing', 'unpaid', 'past_due'].includes(subscription.status);
+        }).length !== 0
     } : null;
 
     hbs.updateLocalTemplateOptions(res.locals, _.merge({}, localTemplateOptions, {

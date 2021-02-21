@@ -1,7 +1,7 @@
-const debug = require('ghost-ignition').debug('importer:users'),
-    _ = require('lodash'),
-    BaseImporter = require('./base'),
-    models = require('../../../../models');
+const debug = require('ghost-ignition').debug('importer:users');
+const _ = require('lodash');
+const BaseImporter = require('./base');
+const models = require('../../../../models');
 
 class UsersImporter extends BaseImporter {
     constructor(allDataFromFile) {
@@ -30,7 +30,8 @@ class UsersImporter extends BaseImporter {
     beforeImport() {
         debug('beforeImport');
 
-        let role, lookup = {};
+        let role;
+        let lookup = {};
 
         // NOTE: sort out duplicated roles based on incremental id
         _.each(this.requiredFromFile.roles_users, (attachedRole) => {
@@ -46,9 +47,9 @@ class UsersImporter extends BaseImporter {
         this.requiredFromFile.roles_users = _.toArray(lookup);
 
         _.each(this.requiredFromFile.roles_users, (attachedRole) => {
-            role = _.find(this.requiredFromFile.roles, (role) => {
-                if (attachedRole.role_id === role.id) {
-                    return role;
+            role = _.find(this.requiredFromFile.roles, (requiredRole) => {
+                if (attachedRole.role_id === requiredRole.id) {
+                    return requiredRole;
                 }
             });
 

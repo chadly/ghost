@@ -1,9 +1,23 @@
 const _ = require('lodash');
+const crypto = require('crypto');
 const debug = require('ghost-ignition').debug('frontend:services:settings:index');
 const SettingsLoader = require('./loader');
 const ensureSettingsFiles = require('./ensure-settings');
 
-const common = require('../../../server/lib/common');
+const errors = require('@tryghost/errors');
+
+/**
+ * md5 hashes of default settings
+ */
+const defaultHashes = {
+    routes: '3d180d52c663d173a6be791ef411ed01'
+};
+
+const calculateHash = (data) => {
+    return crypto.createHash('md5')
+        .update(data, 'binary')
+        .digest('hex');
+};
 
 module.exports = {
     init: function () {
@@ -39,7 +53,7 @@ module.exports = {
         // CASE: this should be an edge case and only if internal usage of the
         // getter is incorrect.
         if (!setting || _.indexOf(knownSettings, setting) < 0) {
-            throw new common.errors.IncorrectUsageError({
+            throw new errors.IncorrectUsageError({
                 message: `Requested setting is not supported: '${setting}'.`,
                 help: `Please use only the supported settings: ${knownSettings}.`
             });
@@ -68,13 +82,23 @@ module.exports = {
      * `/content/settings` directory.
      */
     getAll: function getAll() {
-        const knownSettings = this.knownSettings(),
-            settingsToReturn = {};
+        const knownSettings = this.knownSettings();
+        const settingsToReturn = {};
 
         _.each(knownSettings, function (setting) {
             settingsToReturn[setting] = SettingsLoader(setting);
         });
 
         return settingsToReturn;
+    },
+
+    getDefaulHash: (setting) => {
+        return defaultHashes[setting];
+    },
+
+    getCurrentHash: async (setting) => {
+        const data = await SettingsLoader.loadSettings(setting);
+
+        return calculateHash(JSON.stringify(data));
     }
 };

@@ -1,13 +1,11 @@
-var debug = require('ghost-ignition').debug('themes:loader'),
-    config = require('../../../server/config'),
-    packageJSON = require('../../../server/lib/fs/package-json'),
-    themeList = require('./list'),
-    loadAllThemes,
-    loadOneTheme;
+const debug = require('ghost-ignition').debug('themes:loader');
+const config = require('../../../shared/config');
+const packageJSON = require('../../../server/lib/fs/package-json');
+const themeList = require('./list');
 
-loadAllThemes = function loadAllThemes() {
-    return packageJSON.read
-        .all(config.getContentPath('themes'))
+const loadAllThemes = function loadAllThemes() {
+    return packageJSON
+        .readPackages(config.getContentPath('themes'))
         .then(function updateThemeList(themes) {
             debug('loading themes', Object.keys(themes));
 
@@ -15,9 +13,9 @@ loadAllThemes = function loadAllThemes() {
         });
 };
 
-loadOneTheme = function loadOneTheme(themeName) {
-    return packageJSON.read
-        .one(config.getContentPath('themes'), themeName)
+const loadOneTheme = function loadOneTheme(themeName) {
+    return packageJSON
+        .readPackage(config.getContentPath('themes'), themeName)
         .then(function (readThemes) {
             debug('loaded one theme', themeName);
             return themeList.set(themeName, readThemes[themeName]);

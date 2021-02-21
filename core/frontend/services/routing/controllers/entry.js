@@ -1,8 +1,8 @@
 const debug = require('ghost-ignition').debug('services:routing:controllers:entry');
 const url = require('url');
-const config = require('../../../../server/config');
+const config = require('../../../../shared/config');
 const urlService = require('../../../services/url');
-const urlUtils = require('../../../../server/lib/url-utils');
+const urlUtils = require('../../../../shared/url-utils');
 const helpers = require('../helpers');
 
 /**
@@ -41,7 +41,7 @@ module.exports = function entryController(req, res, next) {
                 debug('redirect. is edit url');
                 const resourceType = entry.page ? 'page' : 'post';
 
-                return urlUtils.redirectToAdmin(302, res, `/editor/${resourceType}/${entry.id}`);
+                return urlUtils.redirectToAdmin(302, res, `/#/editor/${resourceType}/${entry.id}`);
             }
 
             /**
@@ -81,11 +81,6 @@ module.exports = function entryController(req, res, next) {
                     pathname: url.parse(entry.url).pathname,
                     search: url.parse(req.originalUrl).search
                 }));
-            }
-
-            // CASE: Add access property to entry for v3+ api
-            if (res.locals.apiVersion !== 'v0.1' && res.locals.apiVersion !== 'v2') {
-                entry.access = !!entry.html;
             }
 
             helpers.secure(req, entry);

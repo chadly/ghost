@@ -2,7 +2,7 @@ const debug = require('ghost-ignition').debug('importer:posts');
 const _ = require('lodash');
 const uuid = require('uuid');
 const BaseImporter = require('./base');
-const converters = require('../../../../lib/mobiledoc/converters');
+const mobiledocLib = require('../../../../lib/mobiledoc');
 const validation = require('../../../validation');
 const postsMetaSchema = require('../../../schema').tables.posts_meta;
 const metaAttrs = _.keys(_.omit(postsMetaSchema, ['id']));
@@ -32,6 +32,15 @@ class PostsImporter extends BaseImporter {
                     obj.type = obj.page ? 'page' : 'post';
                 }
                 delete obj.page;
+            }
+
+            if (_.has(obj, 'send_email_when_published')) {
+                if (obj.send_email_when_published) {
+                    obj.email_recipient_filter = obj.visibility === 'paid' ? 'paid' : 'all';
+                } else {
+                    obj.email_recipient_filter = 'none';
+                }
+                delete obj.send_email_when_published;
             }
         });
     }
@@ -200,11 +209,11 @@ class PostsImporter extends BaseImporter {
                     mobiledoc = JSON.parse(model.mobiledoc);
 
                     if (!mobiledoc.cards || !_.isArray(mobiledoc.cards)) {
-                        model.mobiledoc = converters.mobiledocConverter.blankStructure();
+                        model.mobiledoc = mobiledocLib.blankDocument;
                         mobiledoc = model.mobiledoc;
                     }
                 } catch (err) {
-                    mobiledoc = converters.mobiledocConverter.blankStructure();
+                    mobiledoc = mobiledocLib.blankDocument;
                 }
 
                 mobiledoc.cards.forEach((card) => {
@@ -216,7 +225,7 @@ class PostsImporter extends BaseImporter {
                 });
 
                 model.mobiledoc = JSON.stringify(mobiledoc);
-                model.html = converters.mobiledocConverter.render(JSON.parse(model.mobiledoc));
+                model.html = mobiledocLib.mobiledocHtmlRenderer.render(JSON.parse(model.mobiledoc));
             }
             this.sanitizePostsMeta(model);
         });

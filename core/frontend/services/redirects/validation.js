@@ -1,5 +1,6 @@
 const _ = require('lodash');
-const common = require('../../../server/lib/common');
+const {i18n} = require('../../../server/lib/common');
+const errors = require('@tryghost/errors');
 
 /**
  * Redirects are file based at the moment, but they will live in the database in the future.
@@ -7,18 +8,18 @@ const common = require('../../../server/lib/common');
  */
 const validate = (redirects) => {
     if (!_.isArray(redirects)) {
-        throw new common.errors.ValidationError({
-            message: common.i18n.t('errors.utils.redirectsWrongFormat'),
-            help: 'https://ghost.org/docs/api/handlebars-themes/routing/redirects/'
+        throw new errors.ValidationError({
+            message: i18n.t('errors.utils.redirectsWrongFormat'),
+            help: 'https://ghost.org/docs/themes/routing/#redirects'
         });
     }
 
     _.each(redirects, function (redirect) {
         if (!redirect.from || !redirect.to) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.utils.redirectsWrongFormat'),
+            throw new errors.ValidationError({
+                message: i18n.t('errors.utils.redirectsWrongFormat'),
                 context: redirect,
-                help: 'https://ghost.org/docs/api/handlebars-themes/routing/redirects/'
+                help: 'https://ghost.org/docs/themes/routing/#redirects'
             });
         }
     });

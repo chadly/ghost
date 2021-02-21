@@ -1,6 +1,5 @@
 const _ = require('lodash');
 const localUtils = require('../../../index');
-const config = require('../../../../../../config');
 
 const tag = (attrs, frame) => {
     if (localUtils.isContentAPI(frame)) {
@@ -71,6 +70,8 @@ const author = (attrs, frame) => {
 };
 
 const post = (attrs, frame) => {
+    const columns = frame && frame.options && frame.options.columns || null;
+    const fields = frame && frame.original && frame.original.query && frame.original.query.fields || null;
     if (localUtils.isContentAPI(frame)) {
         // @TODO: https://github.com/TryGhost/Ghost/issues/10335
         // delete attrs.page;
@@ -96,11 +97,19 @@ const post = (attrs, frame) => {
             attrs.og_description = null;
         }
         // NOTE: the visibility column has to be always present in Content API response to perform content gating
-        if (frame.options.columns && frame.options.columns.includes('visibility') && !frame.original.query.fields.includes('visibility')) {
+        if (columns && columns.includes('visibility') && fields && !fields.includes('visibility')) {
             delete attrs.visibility;
         }
     } else {
         delete attrs.page;
+    }
+
+    if (columns && columns.includes('email_recipient_filter') && fields && !fields.includes('email_recipient_filter')) {
+        delete attrs.email_recipient_filter;
+    }
+
+    if (fields && !fields.includes('send_email_when_published')) {
+        delete attrs.send_email_when_published;
     }
 
     if (!attrs.tags) {
@@ -143,28 +152,7 @@ const action = (attrs) => {
     }
 };
 
-const settings = (attrs) => {
-    if (_.isArray(attrs)) {
-        attrs.forEach((attr) => {
-            if (attr.key === 'bulk_email_settings') {
-                const {provider, apiKey, domain, baseUrl} = attr.value ? JSON.parse(attr.value) : {};
-
-                const bulkEmailConfig = config.get('bulkEmail');
-                const hasMailgunConfig = !!(bulkEmailConfig && bulkEmailConfig.mailgun);
-                const hasMailgunSetting = !!(apiKey && baseUrl && domain);
-
-                attr.value = JSON.stringify({
-                    provider, apiKey, domain, baseUrl,
-                    isEnabled: (hasMailgunConfig || hasMailgunSetting),
-                    isConfig: hasMailgunConfig
-                });
-            }
-        });
-    }
-};
-
 module.exports.post = post;
 module.exports.tag = tag;
 module.exports.author = author;
 module.exports.action = action;
-module.exports.settings = settings;

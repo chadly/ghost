@@ -1,6 +1,7 @@
-const common = require('../../lib/common');
+const errors = require('@tryghost/errors');
+const {i18n} = require('../../lib/common');
 const models = require('../../models');
-const security = require('../../lib/security');
+const security = require('@tryghost/security');
 
 async function accept(invitation) {
     const data = invitation.invitation[0];
@@ -10,11 +11,20 @@ async function accept(invitation) {
     let invite = await models.Invite.findOne({token: inviteToken, status: 'sent'}, options);
 
     if (!invite) {
-        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.inviteNotFound')});
+        throw new errors.NotFoundError({message: i18n.t('errors.api.invites.inviteNotFound')});
     }
 
     if (invite.get('expires') < Date.now()) {
-        throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.invites.inviteExpired')});
+        throw new errors.NotFoundError({message: i18n.t('errors.api.invites.inviteExpired')});
+    }
+
+    let user = await models.User.findOne({email: data.email});
+    if (user) {
+        throw new errors.ValidationError({
+            message: i18n.t('errors.api.invites.inviteEmailAlreadyExist.message'),
+            context: i18n.t('errors.api.invites.inviteEmailAlreadyExist.context'),
+            help: i18n.t('errors.api.invites.inviteEmailAlreadyExist.help')
+        });
     }
 
     await models.User.add({

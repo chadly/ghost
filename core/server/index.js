@@ -11,14 +11,17 @@ require('./overrides');
 
 const debug = require('ghost-ignition').debug('boot:init');
 const Promise = require('bluebird');
-const config = require('./config');
-const common = require('./lib/common');
+const config = require('../shared/config');
+const {events, i18n} = require('./lib/common');
+const logging = require('../shared/logging');
 const migrator = require('./data/db/migrator');
-const urlUtils = require('./lib/url-utils');
+const urlUtils = require('./../shared/url-utils');
 let parentApp;
 
 // Frontend Components
 const themeService = require('../frontend/services/themes');
+const appService = require('../frontend/services/apps');
+const frontendSettings = require('../frontend/services/settings');
 
 function initialiseServices() {
     // CASE: When Ghost is ready with bootstrapping (db migrations etc.), we can trigger the router creation.
@@ -29,15 +32,16 @@ function initialiseServices() {
     // We pass the themeService API version here, so that the frontend services are less tightly-coupled
     routing.bootstrap.start(themeService.getApiVersion());
 
-    const permissions = require('./services/permissions'),
-        apps = require('./services/apps'),
-        xmlrpc = require('./services/xmlrpc'),
-        slack = require('./services/slack'),
-        {mega} = require('./services/mega'),
-        webhooks = require('./services/webhooks'),
-        scheduling = require('./adapters/scheduling');
+    const settings = require('./services/settings');
+    const permissions = require('./services/permissions');
+    const xmlrpc = require('./services/xmlrpc');
+    const slack = require('./services/slack');
+    const {mega} = require('./services/mega');
+    const webhooks = require('./services/webhooks');
+    const scheduling = require('./adapters/scheduling');
 
     debug('`initialiseServices` Start...');
+    const getRoutesHash = () => frontendSettings.getCurrentHash('routes');
 
     return Promise.join(
         // Initialize the permissions actions and objects
@@ -46,18 +50,15 @@ function initialiseServices() {
         slack.listen(),
         mega.listen(),
         webhooks.listen(),
-        apps.init(),
+        settings.syncRoutesHash(getRoutesHash),
+        appService.init(),
         scheduling.init({
-            schedulerUrl: config.get('scheduling').schedulerUrl,
-            active: config.get('scheduling').active,
             // NOTE: When changing API version need to consider how to migrate custom scheduling adapters
             //       that rely on URL to lookup persisted scheduled records (jobs, etc.). Ref: https://github.com/TryGhost/Ghost/pull/10726#issuecomment-489557162
-            apiUrl: urlUtils.urlFor('api', {version: 'v3', versionType: 'admin'}, true),
-            internalPath: config.get('paths').internalSchedulingPath,
-            contentPath: config.getContentPath('scheduling')
+            apiUrl: urlUtils.urlFor('api', {version: 'v3', versionType: 'admin'}, true)
         })
     ).then(function () {
-        debug('XMLRPC, Slack, MEGA, Webhooks, Apps, Scheduling, Permissions done');
+        debug('XMLRPC, Slack, MEGA, Webhooks, Scheduling, Permissions done');
 
         // Initialise analytics events
         if (config.get('segment:key')) {
@@ -66,6 +67,18 @@ function initialiseServices() {
     }).then(function () {
         debug('...`initialiseServices` End');
     });
+}
+
+async function initializeRecurringJobs() {
+    // we don't want to kick off scheduled/recurring jobs that will interfere with tests
+    if (process.env.NODE_ENV.match(/^testing/)) {
+        return;
+    }
+
+    if (config.get('backgroundJobs:emailAnalytics')) {
+        const emailAnalyticsJobs = require('./services/email-analytics/jobs');
+        await emailAnalyticsJobs.scheduleRecurringJobs();
+    }
 }
 
 /**
@@ -79,16 +92,14 @@ function initialiseServices() {
  */
 const minimalRequiredSetupToStartGhost = (dbState) => {
     const settings = require('./services/settings');
+    const jobService = require('./services/jobs');
     const models = require('./models');
     const GhostServer = require('./ghost-server');
-
-    // Frontend
-    const frontendSettings = require('../frontend/services/settings');
 
     let ghostServer;
 
     // Initialize Ghost core internationalization
-    common.i18n.init();
+    i18n.init();
     debug('Default i18n done for core');
 
     models.init();
@@ -107,7 +118,7 @@ const minimalRequiredSetupToStartGhost = (dbState) => {
         .then(() => {
             debug('Themes done');
 
-            parentApp = require('./web/parent-app')();
+            parentApp = require('./web/parent/app')();
             debug('Express Apps done');
 
             return new GhostServer(parentApp);
@@ -115,11 +126,18 @@ const minimalRequiredSetupToStartGhost = (dbState) => {
         .then((_ghostServer) => {
             ghostServer = _ghostServer;
 
+            ghostServer.registerCleanupTask(async () => {
+                await jobService.shutdown();
+            });
+
             // CASE: all good or db was just initialised
             if (dbState === 1 || dbState === 2) {
-                common.events.emit('db.ready');
+                events.emit('db.ready');
 
                 return initialiseServices()
+                    .then(() => {
+                        initializeRecurringJobs();
+                    })
                     .then(() => {
                         return ghostServer;
                     });
@@ -127,24 +145,29 @@ const minimalRequiredSetupToStartGhost = (dbState) => {
 
             // CASE: migrations required, put blog into maintenance mode
             if (dbState === 4) {
-                common.logging.info('Blog is in maintenance mode.');
+                logging.info('Blog is in maintenance mode.');
 
                 config.set('maintenance:enabled', true);
 
                 migrator.migrate()
                     .then(() => {
-                        common.events.emit('db.ready');
-                        return initialiseServices();
+                        return settings.reinit().then(() => {
+                            events.emit('db.ready');
+                            return initialiseServices();
+                        });
                     })
                     .then(() => {
                         config.set('maintenance:enabled', false);
-                        common.logging.info('Blog is out of maintenance mode.');
-                        return GhostServer.announceServerStart();
+                        logging.info('Blog is out of maintenance mode.');
+                        return GhostServer.announceServerReadiness();
+                    })
+                    .then(() => {
+                        initializeRecurringJobs();
                     })
                     .catch((err) => {
-                        return GhostServer.announceServerStopped(err)
+                        return GhostServer.announceServerReadiness(err)
                             .finally(() => {
-                                common.logging.error(err);
+                                logging.error(err);
                                 setTimeout(() => {
                                     process.exit(-1);
                                 }, 100);

@@ -10,21 +10,23 @@
  * 2. req.params.page - always has the page parameter, regardless of if the URL contains a keyword
  * 3. data - used for telling the difference between posts and pages
  */
-const // @TODO: fix this!! These regexes are app specific and should be dynamic. They should not belong here....
-    // routeKeywords.private: 'private'
-    privatePattern = new RegExp('^\\/private\\/'),
-    // routeKeywords.amp: 'amp'
-    ampPattern = new RegExp('\\/amp\\/$'),
-    homePattern = new RegExp('^\\/$');
+// @TODO: fix this!! These regexes are app specific and should be dynamic. They should not belong here....
+// routeKeywords.private: 'private'
+const privatePattern = new RegExp('^\\/private\\/');
+
+// routeKeywords.amp: 'amp'
+const ampPattern = new RegExp('\\/amp\\/$');
+
+const homePattern = new RegExp('^\\/$');
 
 function setResponseContext(req, res, data) {
-    var pageParam = req.params && req.params.page !== undefined ? parseInt(req.params.page, 10) : 1;
+    const pageParam = req.params && req.params.page !== undefined ? parseInt(req.params.page, 10) : 1;
 
     res.locals = res.locals || {};
     res.locals.context = [];
 
     // If we don't have a relativeUrl, we can't detect the context, so return
-    // See shared/middlewares/ghost-locals
+    // See web/parent/middleware/ghost-locals
     if (!res.locals.relativeUrl) {
         return;
     }
@@ -57,6 +59,7 @@ function setResponseContext(req, res, data) {
 
     // @TODO: remove first if condition when only page key is returned
     //        ref.: https://github.com/TryGhost/Ghost/issues/10042
+    // The first if is now used by the preview route
     if (data && data.post && data.post.page) {
         if (!res.locals.context.includes('page')) {
             res.locals.context.push('page');
@@ -68,6 +71,10 @@ function setResponseContext(req, res, data) {
     } else if (data && data.page) {
         if (!res.locals.context.includes('page')) {
             res.locals.context.push('page');
+        }
+    } else if (data && data.tag) {
+        if (!res.locals.context.includes('tag')) {
+            res.locals.context.push('tag');
         }
     }
 }

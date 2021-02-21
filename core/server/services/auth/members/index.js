@@ -1,7 +1,7 @@
 const jwt = require('express-jwt');
 const membersService = require('../../members');
 const labs = require('../../labs');
-const config = require('../../../config');
+const config = require('../../../../shared/config');
 
 let UNO_MEMBERINO;
 
@@ -23,7 +23,7 @@ module.exports = {
                 requestProperty: 'member',
                 audience: siteOrigin,
                 issuer,
-                algorithm: 'RS512',
+                algorithms: ['RS512'],
                 secret(req, payload, done) {
                     membersService.api.getPublicConfig().then(({publicKey}) => {
                         done(null, publicKey);

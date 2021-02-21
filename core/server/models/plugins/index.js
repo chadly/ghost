@@ -1,5 +1,9 @@
 module.exports = {
+    eagerLoad: require('./eager-load'),
     filter: require('./filter'),
+    order: require('./order'),
+    customQuery: require('./custom-query'),
+    search: require('./search'),
     includeCount: require('./include-count'),
     pagination: require('./pagination'),
     collision: require('./collision'),

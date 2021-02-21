@@ -1,13 +1,13 @@
-const path = require('path'),
-    fs = require('fs-extra'),
-    config = require('../../../../config'),
-    common = require('../../../../lib/common'),
-    models = require('../../../../models'),
-    message1 = 'Removing `globals.permalinks` from routes.yaml.',
-    message2 = 'Removed `globals.permalinks` from routes.yaml.',
-    message3 = 'Skip: Removing `globals.permalinks` from routes.yaml.',
-    message4 = 'Rollback: Removing `globals.permalink` from routes.yaml. Nothing todo.',
-    message5 = 'Skip Rollback: Removing `globals.permalinks` from routes.yaml. Nothing todo.';
+const path = require('path');
+const fs = require('fs-extra');
+const config = require('../../../../../shared/config');
+const logging = require('../../../../../shared/logging');
+const models = require('../../../../models');
+const message1 = 'Removing `globals.permalinks` from routes.yaml.';
+const message2 = 'Removed `globals.permalinks` from routes.yaml.';
+const message3 = 'Skip: Removing `globals.permalinks` from routes.yaml.';
+const message4 = 'Rollback: Removing `globals.permalink` from routes.yaml. Nothing todo.';
+const message5 = 'Skip Rollback: Removing `globals.permalinks` from routes.yaml. Nothing todo.';
 
 module.exports.up = () => {
     let localOptions = {
@@ -19,7 +19,7 @@ module.exports.up = () => {
     const filePath = path.join(contentPath, fileName);
     let settingsModel;
 
-    common.logging.info(message1);
+    logging.info(message1);
 
     return fs.readFile(filePath, 'utf8')
         .then((content) => {
@@ -54,10 +54,10 @@ module.exports.up = () => {
                         return fs.writeFile(filePath, modifiedContent, 'utf8');
                     })
                     .then(() => {
-                        common.logging.info(message2);
+                        logging.info(message2);
                     });
             } else {
-                common.logging.warn(message3);
+                logging.warn(message3);
             }
         });
 };
@@ -67,7 +67,7 @@ module.exports.down = () => {
     const contentPath = config.getContentPath('settings');
     const filePath = path.join(contentPath, fileName);
 
-    common.logging.info(message4);
+    logging.info(message4);
 
     return fs.readFile(filePath, 'utf8')
         .then(() => {
@@ -80,6 +80,6 @@ module.exports.down = () => {
             return fs.remove(filePath);
         })
         .catch(() => {
-            common.logging.warn(message5);
+            logging.warn(message5);
         });
 };

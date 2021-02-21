@@ -1,5 +1,5 @@
-var config = require('./core/server/config'),
-    ghostVersion = require('./core/server/lib/ghost-version');
+const config = require('./core/shared/config');
+const ghostVersion = require('./core/server/lib/ghost-version');
 
 /**
  * knex-migrator can be used via CLI or within the application

@@ -21,9 +21,9 @@ const mapTag = (model, frame) => {
     const jsonModel = model.toJSON ? model.toJSON(frame.options) : model;
 
     url.forTag(model.id, jsonModel, frame.options);
-    clean.tag(jsonModel, frame);
+    const cleanedAttrs = clean.tag(jsonModel, frame);
 
-    return jsonModel;
+    return cleanedAttrs;
 };
 
 const mapPost = (model, frame) => {
@@ -76,6 +76,7 @@ const mapPost = (model, frame) => {
 
     delete jsonModel.posts_meta;
     delete jsonModel.send_email_when_published;
+    delete jsonModel.email_recipient_filter;
     delete jsonModel.email_subject;
 
     return jsonModel;
@@ -84,6 +85,19 @@ const mapPost = (model, frame) => {
 const mapSettings = (attrs, frame) => {
     url.forSettings(attrs);
     extraAttrs.forSettings(attrs, frame);
+
+    if (_.isArray(attrs)) {
+        attrs = _.filter(attrs, (o) => {
+            return o.key !== 'lang' && o.key !== 'timezone' && o.key !== 'accent_color';
+        });
+    } else {
+        delete attrs.lang;
+        delete attrs.timezone;
+        delete attrs.codeinjection_head;
+        delete attrs.codeinjection_foot;
+        delete attrs.accent_color;
+    }
+
     return attrs;
 };
 

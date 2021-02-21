@@ -1,7 +1,7 @@
 const _ = require('lodash');
 const Promise = require('bluebird');
-const common = require('../../../../lib/common');
-const converters = require('../../../../lib/mobiledoc/converters');
+const logging = require('../../../../../shared/logging');
+const mobiledocLib = require('../../../../lib/mobiledoc');
 const models = require('../../../../models');
 const message1 = 'Migrating Koenig beta post\'s mobiledoc/HTML to 2.0 format';
 const message2 = 'Migrated Koenig beta post\'s mobiledoc/HTML to 2.0 format';
@@ -33,7 +33,7 @@ module.exports.up = function regenerateKoenigBetaHTML(options) {
         context: {internal: true}
     }, options);
 
-    common.logging.info(message1);
+    logging.info(message1);
 
     return models.Post.findAll(_.merge({columns: postAllColumns}, localOptions))
         .then(function (posts) {
@@ -54,7 +54,7 @@ module.exports.up = function regenerateKoenigBetaHTML(options) {
 
                     // re-render the html to remove .kg-post wrapper and adjust image classes
                     let version = 2;
-                    let html = converters.mobiledocConverter.render(mobiledoc, version);
+                    let html = mobiledocLib.mobiledocHtmlRenderer.render(mobiledoc, {version});
 
                     return models.Post.edit({
                         html,
@@ -64,6 +64,6 @@ module.exports.up = function regenerateKoenigBetaHTML(options) {
             }, {concurrency: 100});
         })
         .then(() => {
-            common.logging.info(message2);
+            logging.info(message2);
         });
 };

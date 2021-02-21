@@ -1,7 +1,8 @@
 const _ = require('lodash');
 const Promise = require('bluebird');
-const common = require('../../lib/common');
-const sequence = require('../../lib/promise/sequence');
+const {i18n} = require('../../lib/common');
+const errors = require('@tryghost/errors');
+const {sequence} = require('@tryghost/promise');
 
 /**
  * Why and when do we have to fetch `authors` by default?
@@ -113,7 +114,7 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
 
             // CASE: you can't delete all authors
             if (model.get('authors') && !model.get('authors').length) {
-                throw new common.errors.ValidationError({
+                throw new errors.ValidationError({
                     message: 'At least one author is required.'
                 });
             }
@@ -194,7 +195,7 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
              */
             if (this._originalOptions.withRelated && this._originalOptions.withRelated && this._originalOptions.withRelated.indexOf('author') !== -1) {
                 if (!authors.models.length) {
-                    throw new common.errors.ValidationError({
+                    throw new errors.ValidationError({
                         message: 'The target post has no primary author.'
                     });
                 }
@@ -291,13 +292,13 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
          * @param  {[type]} options has context and id. Context is the user doing the destroy, id is the user to destroy
          */
         destroyByAuthor: function destroyByAuthor(unfilteredOptions) {
-            let options = this.filterOptions(unfilteredOptions, 'destroyByAuthor', {extraAllowedProperties: ['id']}),
-                postCollection = Posts.forge(),
-                authorId = options.id;
+            let options = this.filterOptions(unfilteredOptions, 'destroyByAuthor', {extraAllowedProperties: ['id']});
+            let postCollection = Posts.forge();
+            let authorId = options.id;
 
             if (!authorId) {
-                return Promise.reject(new common.errors.NotFoundError({
-                    message: common.i18n.t('errors.models.post.noUserFound')
+                return Promise.reject(new errors.NotFoundError({
+                    message: i18n.t('errors.models.post.noUserFound')
                 }));
             }
 
@@ -314,10 +315,10 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
                         return (options.transacting || ghostBookshelf.knex)('posts_authors')
                             .where('author_id', authorId)
                             .del()
-                            .return(response);
+                            .then(() => response);
                     })
                     .catch((err) => {
-                        throw new common.errors.GhostError({err: err});
+                        throw new errors.GhostError({err: err});
                     });
             });
 
@@ -331,10 +332,15 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
             return destroyPost();
         },
 
-        permissible: function permissible(postModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasAppPermission, hasApiKeyPermission) {
-            var self = this,
-                postModel = postModelOrId,
-                origArgs, isContributor, isAuthor, isEdit, isAdd, isDestroy;
+        permissible: function permissible(postModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasApiKeyPermission) {
+            const self = this;
+            const postModel = postModelOrId;
+            let origArgs;
+            let isContributor;
+            let isAuthor;
+            let isEdit;
+            let isAdd;
+            let isDestroy;
 
             // If we passed in an id instead of a model, get the model
             // then check the permissions
@@ -346,9 +352,8 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
                 return this.findOne({id: postModelOrId, status: 'all'}, {withRelated: ['authors']})
                     .then(function then(foundPostModel) {
                         if (!foundPostModel) {
-                            throw new common.errors.NotFoundError({
-                                level: 'critical',
-                                message: common.i18n.t('errors.models.post.postNotFound')
+                            throw new errors.NotFoundError({
+                                message: i18n.t('errors.models.post.postNotFound')
                             });
                         }
 
@@ -420,7 +425,7 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
                 hasUserPermission = hasUserPermission || isPrimaryAuthor();
             }
 
-            if (hasUserPermission && hasApiKeyPermission && hasAppPermission) {
+            if (hasUserPermission && hasApiKeyPermission) {
                 return Post.permissible.call(
                     this,
                     postModelOrId,
@@ -428,7 +433,6 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
                     unsafeAttrs,
                     loadedPermissions,
                     hasUserPermission,
-                    hasAppPermission,
                     hasApiKeyPermission
                 ).then(({excludedAttrs}) => {
                     // @TODO: we need a concept for making a diff between incoming authors and existing authors
@@ -444,8 +448,8 @@ module.exports.extendModel = function extendModel(Post, Posts, ghostBookshelf) {
                 });
             }
 
-            return Promise.reject(new common.errors.NoPermissionError({
-                message: common.i18n.t('errors.models.post.notEnoughPermission')
+            return Promise.reject(new errors.NoPermissionError({
+                message: i18n.t('errors.models.post.notEnoughPermission')
             }));
         }
     });

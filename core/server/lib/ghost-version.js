@@ -1,14 +1,14 @@
-const semver = require('semver'),
-    packageInfo = require('../../../package.json'),
-    version = packageInfo.version,
-    plainVersion = version.match(/^(\d+\.)?(\d+\.)?(\d+)/)[0];
+const semver = require('semver');
+const packageInfo = require('../../../package.json');
+const version = packageInfo.version;
+const plainVersion = version.match(/^(\d+\.)?(\d+\.)?(\d+)/)[0];
 
 let _private = {};
 
 _private.compose = function compose(type) {
     switch (type) {
     case 'pre':
-        return plainVersion + '-' + semver.prerelease(version)[0] + (semver.prerelease(version)[1] ? '.' + semver.prerelease(version)[1] : '');
+        return plainVersion + '-' + semver.prerelease(version).join('.');
     default:
         return version;
     }

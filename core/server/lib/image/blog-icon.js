@@ -1,126 +1,123 @@
-var sizeOf = require('image-size'),
-    Promise = require('bluebird'),
-    _ = require('lodash'),
-    path = require('path'),
-    config = require('../../config'),
-    common = require('../common'),
-    urlUtils = require('../../lib/url-utils'),
-    settingsCache = require('../../services/settings/cache'),
-    storageUtils = require('../../adapters/storage/utils'),
-    getIconDimensions,
-    isIcoImageType,
-    getIconType,
-    getIconUrl,
-    getIconPath;
+const sizeOf = require('image-size');
+const Promise = require('bluebird');
+const _ = require('lodash');
+const path = require('path');
+const errors = require('@tryghost/errors');
 
-/**
- * Get dimensions for ico file from its real file storage path
- * Always returns {object} getIconDimensions
- * @param {string} path
- * @returns {Promise<Object>} getIconDimensions
- * @description Takes a file path and returns ico width and height.
- */
-getIconDimensions = function getIconDimensions(path) {
-    return new Promise(function getIconSize(resolve, reject) {
-        var dimensions;
+class BlogIcon {
+    constructor({config, i18n, urlUtils, settingsCache, storageUtils}) {
+        this.config = config;
+        this.i18n = i18n;
+        this.urlUtils = urlUtils;
+        this.settingsCache = settingsCache;
+        this.storageUtils = storageUtils;
+    }
 
-        try {
-            dimensions = sizeOf(path);
-
-            if (dimensions.images) {
-                dimensions.width = _.maxBy(dimensions.images, function (w) {
-                    return w.width;
-                }).width;
-                dimensions.height = _.maxBy(dimensions.images, function (h) {
-                    return h.height;
-                }).height;
+    /**
+     * Get dimensions for ico file from its real file storage path
+     * Always returns {object} getIconDimensions
+     * @param {string} path
+     * @returns {Promise<Object>} getIconDimensions
+     * @description Takes a file path and returns ico width and height.
+     */
+    getIconDimensions(storagePath) {
+        return new Promise((resolve, reject) => {
+            let dimensions;
+    
+            try {
+                dimensions = sizeOf(storagePath);
+    
+                if (dimensions.images) {
+                    dimensions.width = _.maxBy(dimensions.images, function (w) {
+                        return w.width;
+                    }).width;
+                    dimensions.height = _.maxBy(dimensions.images, function (h) {
+                        return h.height;
+                    }).height;
+                }
+    
+                return resolve({
+                    width: dimensions.width,
+                    height: dimensions.height
+                });
+            } catch (err) {
+                return reject(new errors.ValidationError({
+                    message: this.i18n.t('errors.utils.blogIcon.error', {
+                        file: storagePath,
+                        error: err.message
+                    })
+                }));
             }
+        });
+    }
 
-            return resolve({
-                width: dimensions.width,
-                height: dimensions.height
-            });
-        } catch (err) {
-            return reject(new common.errors.ValidationError({
-                message: common.i18n.t('errors.utils.blogIcon.error', {
-                    file: path,
-                    error: err.message
-                })
-            }));
-        }
-    });
-};
+    /**
+     * Check if file is `.ico` extension
+     * Always returns {object} isIcoImageType
+     * @param {string} icon
+     * @returns {boolean} true if submitted path is .ico file
+     * @description Takes a path and returns boolean value.
+     */
+    isIcoImageType(icon) {
+        const blogIcon = icon || this.settingsCache.get('icon');
+    
+        return blogIcon.match(/.ico$/i) ? true : false;
+    }
 
-/**
- * Check if file is `.ico` extension
- * Always returns {object} isIcoImageType
- * @param {string} icon
- * @returns {Boolean} true if submitted path is .ico file
- * @description Takes a path and returns boolean value.
- */
-isIcoImageType = function isIcoImageType(icon) {
-    var blogIcon = icon || settingsCache.get('icon');
+    /**
+     * Check if file is `.ico` extension
+     * Always returns {object} isIcoImageType
+     * @param {string} icon
+     * @returns {boolean} true if submitted path is .ico file
+     * @description Takes a path and returns boolean value.
+     */
+    getIconType(icon) {
+        const blogIcon = icon || this.settingsCache.get('icon');
+    
+        return this.isIcoImageType(blogIcon) ? 'x-icon' : 'png';
+    }
 
-    return blogIcon.match(/.ico$/i) ? true : false;
-};
-
-/**
- * Check if file is `.ico` extension
- * Always returns {object} isIcoImageType
- * @param {string} icon
- * @returns {Boolean} true if submitted path is .ico file
- * @description Takes a path and returns boolean value.
- */
-getIconType = function getIconType(icon) {
-    var blogIcon = icon || settingsCache.get('icon');
-
-    return isIcoImageType(blogIcon) ? 'x-icon' : 'png';
-};
-
-/**
- * Return URL for Blog icon: [subdirectory or not]favicon.[ico or png]
- * Always returns {string} getIconUrl
- * @returns {string} [subdirectory or not]favicon.[ico or png]
- * @description Checks if we have a custom uploaded icon and the extension of it. If no custom uploaded icon
- * exists, we're returning the default `favicon.ico`
- */
-getIconUrl = function getIconUrl(absolut) {
-    var blogIcon = settingsCache.get('icon');
-
-    if (absolut) {
-        if (blogIcon) {
-            return isIcoImageType(blogIcon) ? urlUtils.urlFor({relativeUrl: '/favicon.ico'}, true) : urlUtils.urlFor({relativeUrl: '/favicon.png'}, true);
+    /**
+     * Return URL for Blog icon: [subdirectory or not]favicon.[ico or png]
+     * Always returns {string} getIconUrl
+     * @returns {string} [subdirectory or not]favicon.[ico or png]
+     * @description Checks if we have a custom uploaded icon and the extension of it. If no custom uploaded icon
+     * exists, we're returning the default `favicon.ico`
+     */
+    getIconUrl(absolut) {
+        const blogIcon = this.settingsCache.get('icon');
+    
+        if (absolut) {
+            if (blogIcon) {
+                return this.isIcoImageType(blogIcon) ? this.urlUtils.urlFor({relativeUrl: '/favicon.ico'}, true) : this.urlUtils.urlFor({relativeUrl: '/favicon.png'}, true);
+            } else {
+                return this.urlUtils.urlFor({relativeUrl: '/favicon.ico'}, true);
+            }
         } else {
-            return urlUtils.urlFor({relativeUrl: '/favicon.ico'}, true);
-        }
-    } else {
-        if (blogIcon) {
-            return isIcoImageType(blogIcon) ? urlUtils.urlFor({relativeUrl: '/favicon.ico'}) : urlUtils.urlFor({relativeUrl: '/favicon.png'});
-        } else {
-            return urlUtils.urlFor({relativeUrl: '/favicon.ico'});
+            if (blogIcon) {
+                return this.isIcoImageType(blogIcon) ? this.urlUtils.urlFor({relativeUrl: '/favicon.ico'}) : this.urlUtils.urlFor({relativeUrl: '/favicon.png'});
+            } else {
+                return this.urlUtils.urlFor({relativeUrl: '/favicon.ico'});
+            }
         }
     }
-};
 
-/**
- * Return path for Blog icon without [subdirectory]/content/image prefix
- * Always returns {string} getIconPath
- * @returns {string} physical storage path of icon
- * @description Checks if we have a custom uploaded icon. If no custom uploaded icon
- * exists, we're returning the default `favicon.ico`
- */
-getIconPath = function getIconPath() {
-    var blogIcon = settingsCache.get('icon');
-
-    if (blogIcon) {
-        return storageUtils.getLocalFileStoragePath(blogIcon);
-    } else {
-        return path.join(config.get('paths:publicFilePath'), 'favicon.ico');
+    /**
+     * Return path for Blog icon without [subdirectory]/content/image prefix
+     * Always returns {string} getIconPath
+     * @returns {string} physical storage path of icon
+     * @description Checks if we have a custom uploaded icon. If no custom uploaded icon
+     * exists, we're returning the default `favicon.ico`
+     */
+    getIconPath() {
+        const blogIcon = this.settingsCache.get('icon');
+    
+        if (blogIcon) {
+            return this.storageUtils.getLocalFileStoragePath(blogIcon);
+        } else {
+            return path.join(this.config.get('paths:publicFilePath'), 'favicon.ico');
+        }
     }
-};
+}
 
-module.exports.getIconDimensions = getIconDimensions;
-module.exports.isIcoImageType = isIcoImageType;
-module.exports.getIconUrl = getIconUrl;
-module.exports.getIconPath = getIconPath;
-module.exports.getIconType = getIconType;
+module.exports = BlogIcon;

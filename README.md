@@ -8,7 +8,6 @@ This repo is setup with a few branches for easier maintenance. The `ghost` branc
 
 ### Changes on the Azure Branch
 
-* Add a `db.js` file in the root to make it easy to initialize/migrate a SQLite database ([since I can't run the CLI tool on Azure](https://www.chadly.net/ghost-on-azure/#clitool)).
 * Force `config.js` to get the port it should run on from `PORT` env variable instead of `SERVER_PORT`. This is to make iisnode happy.
 * Add `web.config` & `iisnode.yml` - standard stuff to host node on IIS.
 * Add support for HSTS headers. Technically, this isn't required to get Ghost running on Azure, [but you should probably do it anyway](https://www.hanselman.com/blog/HowToEnableHTTPStrictTransportSecurityHSTSInIIS7.aspx).

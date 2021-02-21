@@ -1,5 +1,5 @@
 const Promise = require('bluebird');
-const common = require('../../../../lib/common');
+const logging = require('../../../../../shared/logging');
 const schema = require('../../../schema');
 
 /*
@@ -8,16 +8,16 @@ const schema = require('../../../schema');
  *   columns: ['custom_excerpt', 'description', 'etc...']
  * }]
  * */
-const tablesToUpdate = Object.keys(schema.tables).reduce((tablesToUpdate, tableName) => {
+const tablesToUpdate = Object.keys(schema.tables).reduce((tables, tableName) => {
     const table = schema.tables[tableName];
     const columns = Object.keys(table).filter((columnName) => {
         const column = table[columnName];
         return column.nullable && ['string', 'text'].includes(column.type);
     });
     if (!columns.length) {
-        return tablesToUpdate;
+        return tables;
     }
-    return tablesToUpdate.concat({
+    return tables.concat({
         tableName,
         columns
     });
@@ -27,7 +27,7 @@ const createReplace = (connection, from, to) => (tableName, columnName) => {
     return connection.schema.hasTable(tableName)
         .then((tableExists) => {
             if (!tableExists) {
-                common.logging.warn(
+                logging.warn(
                     `Table ${tableName} does not exist`
                 );
                 return;
@@ -35,13 +35,13 @@ const createReplace = (connection, from, to) => (tableName, columnName) => {
             return connection.schema.hasColumn(tableName, columnName)
                 .then((columnExists) => {
                     if (!columnExists) {
-                        common.logging.warn(
+                        logging.warn(
                             `Table '${tableName}' does not have column '${columnName}'`
                         );
                         return;
                     }
 
-                    common.logging.info(
+                    logging.info(
                         `Updating ${tableName}, setting '${from}' in ${columnName} to '${to}'`
                     );
 

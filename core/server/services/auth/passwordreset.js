@@ -1,16 +1,18 @@
 const _ = require('lodash');
-const security = require('../../lib/security');
-const constants = require('../../lib/constants');
-const common = require('../../lib/common');
+const security = require('@tryghost/security');
+const constants = require('@tryghost/constants');
+const errors = require('@tryghost/errors');
+const {i18n} = require('../../lib/common');
 const models = require('../../models');
-const urlUtils = require('../../lib/url-utils');
+const urlUtils = require('../../../shared/url-utils');
 const mail = require('../mail');
 
 const tokenSecurity = {};
 
 function generateToken(email, settingsAPI) {
     const options = {context: {internal: true}};
-    let dbHash, token;
+    let dbHash;
+    let token;
 
     return settingsAPI.read(_.merge({key: 'db_hash'}, options))
         .then((response) => {
@@ -20,7 +22,7 @@ function generateToken(email, settingsAPI) {
         })
         .then((user) => {
             if (!user) {
-                throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.users.userNotFound')});
+                throw new errors.NotFoundError({message: i18n.t('errors.api.users.userNotFound')});
             }
 
             token = security.tokens.resetToken.generateHash({
@@ -45,8 +47,10 @@ function extractTokenParts(options) {
     });
 
     if (!tokenParts) {
-        return Promise.reject(new common.errors.UnauthorizedError({
-            message: common.i18n.t('errors.api.common.invalidTokenStructure')
+        return Promise.reject(new errors.UnauthorizedError({
+            message: i18n.t('errors.api.passwordReset.corruptedToken.message'),
+            context: i18n.t('errors.api.passwordReset.corruptedToken.context'),
+            help: i18n.t('errors.api.passwordReset.corruptedToken.help')
         }));
     }
 
@@ -57,8 +61,8 @@ function extractTokenParts(options) {
 function protectBruteForce({options, tokenParts}) {
     if (tokenSecurity[`${tokenParts.email}+${tokenParts.expires}`] &&
         tokenSecurity[`${tokenParts.email}+${tokenParts.expires}`].count >= 10) {
-        return Promise.reject(new common.errors.NoPermissionError({
-            message: common.i18n.t('errors.models.user.tokenLocked')
+        return Promise.reject(new errors.NoPermissionError({
+            message: i18n.t('errors.models.user.tokenLocked')
         }));
     }
 
@@ -81,19 +85,32 @@ function doReset(options, tokenParts, settingsAPI) {
         })
         .then((user) => {
             if (!user) {
-                throw new common.errors.NotFoundError({message: common.i18n.t('errors.api.users.userNotFound')});
+                throw new errors.NotFoundError({message: i18n.t('errors.api.users.userNotFound')});
             }
 
-            let tokenIsCorrect = security.tokens.resetToken.compare({
+            let compareResult = security.tokens.resetToken.compare({
                 token: resetToken,
                 dbHash: dbHash,
                 password: user.get('password')
             });
 
-            if (!tokenIsCorrect) {
-                return Promise.reject(new common.errors.BadRequestError({
-                    message: common.i18n.t('errors.api.common.invalidTokenStructure')
-                }));
+            if (!compareResult.correct) {
+                let error;
+                if (compareResult.reason === 'expired' || compareResult.reason === 'invalid_expiry') {
+                    error = new errors.BadRequestError({
+                        message: i18n.t('errors.api.passwordReset.expired.message'),
+                        context: i18n.t('errors.api.passwordReset.expired.context'),
+                        help: i18n.t('errors.api.passwordReset.expired.help')
+                    });
+                } else {
+                    error = new errors.BadRequestError({
+                        message: i18n.t('errors.api.passwordReset.invalidToken.message'),
+                        context: i18n.t('errors.api.passwordReset.invalidToken.context'),
+                        help: i18n.t('errors.api.passwordReset.invalidToken.help')
+                    });
+                }
+
+                return Promise.reject(error);
             }
 
             return models.User.changePassword({
@@ -106,24 +123,25 @@ function doReset(options, tokenParts, settingsAPI) {
             updatedUser.set('status', 'active');
             return updatedUser.save(options);
         })
-        .catch(common.errors.ValidationError, (err) => {
+        .catch(errors.ValidationError, (err) => {
             return Promise.reject(err);
         })
         .catch((err) => {
-            if (common.errors.utils.isIgnitionError(err)) {
+            if (errors.utils.isIgnitionError(err)) {
                 return Promise.reject(err);
             }
-            return Promise.reject(new common.errors.UnauthorizedError({err: err}));
+            return Promise.reject(new errors.UnauthorizedError({err: err}));
         });
 }
 
 async function sendResetNotification(data, mailAPI) {
     const adminUrl = urlUtils.urlFor('admin', true);
-    const resetUrl = urlUtils.urlJoin(adminUrl, 'reset', security.url.encodeBase64(data.resetToken), '/');
+    const resetToken = security.url.encodeBase64(data.resetToken);
+    const resetUrl = urlUtils.urlJoin(adminUrl, 'reset', resetToken, '/');
 
     const content = await mail.utils.generateContent({
         data: {
-            resetUrl: resetUrl
+            resetUrl
         },
         template: 'reset-password'
     });
@@ -132,7 +150,7 @@ async function sendResetNotification(data, mailAPI) {
         mail: [{
             message: {
                 to: data.email,
-                subject: common.i18n.t('common.api.authentication.mail.resetPassword'),
+                subject: i18n.t('common.api.authentication.mail.resetPassword'),
                 html: content.html,
                 text: content.text
             },
@@ -144,9 +162,9 @@ async function sendResetNotification(data, mailAPI) {
 }
 
 module.exports = {
-    generateToken: generateToken,
-    extractTokenParts: extractTokenParts,
-    protectBruteForce: protectBruteForce,
-    doReset: doReset,
-    sendResetNotification: sendResetNotification
+    generateToken,
+    extractTokenParts,
+    protectBruteForce,
+    doReset,
+    sendResetNotification
 };
