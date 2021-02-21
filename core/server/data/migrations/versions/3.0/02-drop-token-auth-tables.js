@@ -1,4 +1,5 @@
-const common = require('../../../../lib/common');
+const Promise = require('bluebird');
+const logging = require('../../../../../shared/logging');
 const commands = require('../../../schema').commands;
 
 const tables = [
@@ -13,11 +14,11 @@ module.exports.up = (options) => {
         return connection.schema.hasTable(table)
             .then(function (exists) {
                 if (!exists) {
-                    common.logging.warn(`Dropping table: ${table}`);
+                    logging.warn(`Dropping table: ${table}`);
                     return;
                 }
 
-                common.logging.info(`Dropping table: ${table}`);
+                logging.info(`Dropping table: ${table}`);
                 return commands.deleteTable(table, connection);
             });
     });

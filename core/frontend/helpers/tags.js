@@ -5,29 +5,24 @@
 // By default, tags are separated by commas.
 //
 // Note that the standard {{#each tags}} implementation is unaffected by this helper
-const proxy = require('./proxy');
+const {urlService, SafeString, templates} = require('../services/proxy');
 const _ = require('lodash');
 const ghostHelperUtils = require('@tryghost/helpers').utils;
-
-const urlService = proxy.urlService;
-const SafeString = proxy.SafeString;
-const templates = proxy.templates;
 
 module.exports = function tags(options) {
     options = options || {};
     options.hash = options.hash || {};
 
-    const autolink = !(_.isString(options.hash.autolink) && options.hash.autolink === 'false'),
-        separator = _.isString(options.hash.separator) ? options.hash.separator : ', ',
-        prefix = _.isString(options.hash.prefix) ? options.hash.prefix : '',
-        suffix = _.isString(options.hash.suffix) ? options.hash.suffix : '',
-        limit = options.hash.limit ? parseInt(options.hash.limit, 10) : undefined;
+    const autolink = !(_.isString(options.hash.autolink) && options.hash.autolink === 'false');
+    const separator = _.isString(options.hash.separator) ? options.hash.separator : ', ';
+    const prefix = _.isString(options.hash.prefix) ? options.hash.prefix : '';
+    const suffix = _.isString(options.hash.suffix) ? options.hash.suffix : '';
+    const limit = options.hash.limit ? parseInt(options.hash.limit, 10) : undefined;
+    let output = '';
+    let from = options.hash.from ? parseInt(options.hash.from, 10) : 1;
+    let to = options.hash.to ? parseInt(options.hash.to, 10) : undefined;
 
-    let output = '',
-        from = options.hash.from ? parseInt(options.hash.from, 10) : 1,
-        to = options.hash.to ? parseInt(options.hash.to, 10) : undefined;
-
-    function createTagList(tags) {
+    function createTagList(tagsList) {
         function processTag(tag) {
             return autolink ? templates.link({
                 url: urlService.getUrlByResourceId(tag.id, {withSubdirectory: true}),
@@ -35,7 +30,7 @@ module.exports = function tags(options) {
             }) : _.escape(tag.name);
         }
 
-        return ghostHelperUtils.visibility.filter(tags, options.hash.visibility, processTag);
+        return ghostHelperUtils.visibility.filter(tagsList, options.hash.visibility, processTag);
     }
 
     if (this.tags && this.tags.length) {

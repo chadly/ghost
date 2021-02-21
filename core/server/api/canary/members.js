@@ -1,97 +1,31 @@
 // NOTE: We must not cache references to membersService.api
 // as it is a getter and may change during runtime.
 const Promise = require('bluebird');
+const moment = require('moment-timezone');
+const errors = require('@tryghost/errors');
 const models = require('../../models');
 const membersService = require('../../services/members');
-const common = require('../../lib/common');
-const fsLib = require('../../lib/fs');
-const _ = require('lodash');
 
-const decorateWithSubscriptions = async function (member) {
-    // NOTE: this logic is here until relations between Members/MemberStripeCustomer/StripeCustomerSubscription
-    //       are in place
-    const subscriptions = await membersService.api.members.getStripeSubscriptions(member);
+const settingsCache = require('../../services/settings/cache');
+const {i18n} = require('../../lib/common');
 
-    return Object.assign(member, {
-        stripe: {
-            subscriptions
-        }
-    });
-};
+const allowedIncludes = ['email_recipients'];
 
-/** NOTE: this method should not exist at all and needs to be cleaned up
-    it was created due to a bug in how CSV is currently created for exports
-    Export bug was fixed in 3.6 but method exists to handle older csv exports with undefined
-**/
-
-const cleanupUndefined = (obj) => {
-    for (let key in obj) {
-        if (obj[key] === 'undefined') {
-            delete obj[key];
-        }
-    }
-};
-
-// NOTE: this method can be removed once unique constraints are introduced ref.: https://github.com/TryGhost/Ghost/blob/e277c6b/core/server/data/schema/schema.js#L339
-const sanitizeInput = (members) => {
-    const customersMap = members.reduce((acc, member) => {
-        if (member.stripe_customer_id && member.stripe_customer_id !== 'undefined') {
-            if (acc[member.stripe_customer_id]) {
-                acc[member.stripe_customer_id] += 1;
-            } else {
-                acc[member.stripe_customer_id] = 1;
-            }
-        }
-
-        return acc;
-    }, {});
-
-    const toRemove = [];
-    for (const key in customersMap) {
-        if (customersMap[key] > 1) {
-            toRemove.push(key);
-        }
-    }
-
-    let sanitized = members.filter((member) => {
-        return !(toRemove.includes(member.stripe_customer_id));
-    });
-
-    return sanitized;
-};
-
-function serializeMemberLabels(labels) {
-    if (labels) {
-        return labels.filter((label) => {
-            return !!label;
-        }).map((label) => {
-            if (_.isString(label)) {
-                return {
-                    name: label.trim()
-                };
-            }
-            return label;
-        });
-    }
-    return [];
-}
-
-const listMembers = async function (options) {
-    const res = (await models.Member.findPage(options));
-    const memberModels = res.data.map(model => model.toJSON(options));
-
-    const members = await Promise.all(memberModels.map(async function (member) {
-        return decorateWithSubscriptions(member);
-    }));
-
-    return {
-        members: members,
-        meta: res.meta
-    };
-};
-
-const members = {
+module.exports = {
     docName: 'members',
+
+    hasActiveStripeSubscriptions: {
+        permissions: {
+            method: 'browse'
+        },
+        async query() {
+            const hasActiveStripeSubscriptions = await membersService.api.hasActiveStripeSubscriptions();
+            return {
+                hasActiveStripeSubscriptions
+            };
+        }
+    },
+
     browse: {
         options: [
             'limit',
@@ -99,35 +33,59 @@ const members = {
             'filter',
             'order',
             'debug',
-            'page'
+            'page',
+            'search',
+            'paid'
         ],
         permissions: true,
         validation: {},
         async query(frame) {
-            return listMembers(frame.options);
+            frame.options.withRelated = ['labels', 'stripeSubscriptions', 'stripeSubscriptions.customer'];
+            const page = await membersService.api.members.list(frame.options);
+
+            return page;
         }
     },
 
     read: {
+        options: [
+            'include'
+        ],
         headers: {},
         data: [
             'id',
             'email'
         ],
-        validation: {},
+        validation: {
+            options: {
+                include: {
+                    values: allowedIncludes
+                }
+            }
+        },
         permissions: true,
         async query(frame) {
-            let model = await models.Member.findOne(frame.data, frame.options);
+            const defaultWithRelated = ['labels', 'stripeSubscriptions', 'stripeSubscriptions.customer'];
+
+            if (!frame.options.withRelated) {
+                frame.options.withRelated = defaultWithRelated;
+            } else {
+                frame.options.withRelated = frame.options.withRelated.concat(defaultWithRelated);
+            }
+
+            if (frame.options.withRelated.includes('email_recipients')) {
+                frame.options.withRelated.push('email_recipients.email');
+            }
+
+            let model = await membersService.api.members.get(frame.data, frame.options);
 
             if (!model) {
-                throw new common.errors.NotFoundError({
-                    message: common.i18n.t('errors.api.members.memberNotFound')
+                throw new errors.NotFoundError({
+                    message: i18n.t('errors.api.members.memberNotFound')
                 });
             }
 
-            const member = model.toJSON(frame.options);
-
-            return decorateWithSubscriptions(member);
+            return model;
         }
     },
 
@@ -150,12 +108,22 @@ const members = {
         },
         permissions: true,
         async query(frame) {
-            let model;
-
+            let member;
+            frame.options.withRelated = ['stripeSubscriptions', 'stripeSubscriptions.customer'];
             try {
-                model = await models.Member.add(frame.data.members[0], frame.options);
+                if (!membersService.config.isStripeConnected()
+                    && (frame.data.members[0].stripe_customer_id || frame.data.members[0].comped)) {
+                    const property = frame.data.members[0].comped ? 'comped' : 'stripe_customer_id';
 
-                const member = model.toJSON(frame.options);
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.api.members.stripeNotConnected.message'),
+                        context: i18n.t('errors.api.members.stripeNotConnected.context'),
+                        help: i18n.t('errors.api.members.stripeNotConnected.help'),
+                        property
+                    });
+                }
+
+                member = await membersService.api.members.create(frame.data.members[0], frame.options);
 
                 if (frame.data.members[0].stripe_customer_id) {
                     await membersService.api.members.linkStripeCustomer(frame.data.members[0].stripe_customer_id, member);
@@ -166,25 +134,34 @@ const members = {
                 }
 
                 if (frame.options.send_email) {
-                    await membersService.api.sendEmailWithMagicLink({email: model.get('email'), requestedType: frame.options.email_type});
+                    await membersService.api.sendEmailWithMagicLink({email: member.get('email'), requestedType: frame.options.email_type});
                 }
 
-                return decorateWithSubscriptions(member);
+                return member;
             } catch (error) {
                 if (error.code && error.message.toLowerCase().indexOf('unique') !== -1) {
-                    throw new common.errors.ValidationError({message: common.i18n.t('errors.api.members.memberAlreadyExists')});
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.models.member.memberAlreadyExists.message'),
+                        context: i18n.t('errors.models.member.memberAlreadyExists.context', {
+                            action: 'add'
+                        })
+                    });
                 }
 
-                // NOTE: failed to link Stripe customer/plan/subscription
-                if (model && error.message && (error.message.indexOf('customer') || error.message.indexOf('plan') || error.message.indexOf('subscription'))) {
-                    const api = require('./index');
+                // NOTE: failed to link Stripe customer/plan/subscription or have thrown custom Stripe connection error.
+                //       It's a bit ugly doing regex matching to detect errors, but it's the easiest way that works without
+                //       introducing additional logic/data format into current error handling
+                const isStripeLinkingError = error.message && (error.message.match(/customer|plan|subscription/g));
+                if (member && isStripeLinkingError) {
+                    if (error.message.indexOf('customer') && error.code === 'resource_missing') {
+                        error.message = `Member not imported. ${error.message}`;
+                        error.context = i18n.t('errors.api.members.stripeCustomerNotFound.context');
+                        error.help = i18n.t('errors.api.members.stripeCustomerNotFound.help');
+                    }
 
-                    await api.members.destroy.query({
-                        options: {
-                            context: frame.options.context,
-                            id: model.id
-                        }
-                    });
+                    await membersService.api.members.destroy({
+                        id: member.get('id')
+                    }, frame.options);
                 }
 
                 throw error;
@@ -207,24 +184,86 @@ const members = {
         },
         permissions: true,
         async query(frame) {
-            const model = await models.Member.edit(frame.data.members[0], frame.options);
+            try {
+                frame.options.withRelated = ['stripeSubscriptions', 'labels'];
+                const member = await membersService.api.members.update(frame.data.members[0], frame.options);
 
-            const member = model.toJSON(frame.options);
+                const hasCompedSubscription = !!member.related('stripeSubscriptions').find(sub => sub.get('plan_nickname') === 'Complimentary' && sub.get('status') === 'active');
 
-            const subscriptions = await membersService.api.members.getStripeSubscriptions(member);
-            const compedSubscriptions = subscriptions.filter(sub => (sub.plan.nickname === 'Complimentary'));
+                if (typeof frame.data.members[0].comped === 'boolean') {
+                    if (frame.data.members[0].comped && !hasCompedSubscription) {
+                        await membersService.api.members.setComplimentarySubscription(member);
+                    } else if (!(frame.data.members[0].comped) && hasCompedSubscription) {
+                        await membersService.api.members.cancelComplimentarySubscription(member);
+                    }
 
-            if (frame.data.members[0].comped !== undefined && (frame.data.members[0].comped !== compedSubscriptions)) {
-                const hasCompedSubscription = !!(compedSubscriptions.length);
+                    await member.load(['stripeSubscriptions']);
+                }
 
-                if (frame.data.members[0].comped && !hasCompedSubscription) {
-                    await membersService.api.members.setComplimentarySubscription(member);
-                } else if (!(frame.data.members[0].comped) && hasCompedSubscription) {
-                    await membersService.api.members.cancelComplimentarySubscription(member);
+                await member.load(['stripeSubscriptions.customer']);
+
+                return member;
+            } catch (error) {
+                if (error.code && error.message.toLowerCase().indexOf('unique') !== -1) {
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.models.member.memberAlreadyExists.message'),
+                        context: i18n.t('errors.models.member.memberAlreadyExists.context', {
+                            action: 'edit'
+                        })
+                    });
+                }
+
+                throw error;
+            }
+        }
+    },
+
+    editSubscription: {
+        statusCode: 200,
+        headers: {},
+        options: [
+            'id',
+            'subscription_id'
+        ],
+        data: [
+            'cancel_at_period_end'
+        ],
+        validation: {
+            options: {
+                id: {
+                    required: true
+                },
+                subscription_id: {
+                    required: true
+                }
+            },
+            data: {
+                cancel_at_period_end: {
+                    required: true
                 }
             }
+        },
+        permissions: {
+            method: 'edit'
+        },
+        async query(frame) {
+            await membersService.api.members.updateSubscription({
+                id: frame.options.id,
+                subscription: {
+                    subscription_id: frame.options.subscription_id,
+                    cancel_at_period_end: frame.data.cancel_at_period_end
+                }
+            });
+            let model = await membersService.api.members.get({id: frame.options.id}, {
+                withRelated: ['labels', 'stripeSubscriptions', 'stripeSubscriptions.customer']
+            });
+            if (!model) {
+                throw new errors.NotFoundError({
+                    message: i18n.t('errors.api.members.memberNotFound')
+                });
+            }
 
-            return decorateWithSubscriptions(member);
+            return model;
         }
     },
 
@@ -232,7 +271,8 @@ const members = {
         statusCode: 204,
         headers: {},
         options: [
-            'id'
+            'id',
+            'cancel'
         ],
         validation: {
             options: {
@@ -244,28 +284,17 @@ const members = {
         permissions: true,
         async query(frame) {
             frame.options.require = true;
+            frame.options.cancelStripeSubscriptions = frame.options.cancel;
 
-            let member = await models.Member.findOne(frame.options);
-
-            if (!member) {
-                throw new common.errors.NotFoundError({
-                    message: common.i18n.t('errors.api.resource.resourceNotFound', {
+            await Promise.resolve(membersService.api.members.destroy({
+                id: frame.options.id
+            }, frame.options)).catch(models.Member.NotFoundError, () => {
+                throw new errors.NotFoundError({
+                    message: i18n.t('errors.api.resource.resourceNotFound', {
                         resource: 'Member'
                     })
                 });
-            }
-
-            // NOTE: move to a model layer once Members/MemberStripeCustomer relations are in place
-            await membersService.api.members.destroyStripeSubscriptions(member);
-
-            await models.Member.destroy(frame.options)
-                .catch(models.Member.NotFoundError, () => {
-                    throw new common.errors.NotFoundError({
-                        message: common.i18n.t('errors.api.resource.resourceNotFound', {
-                            resource: 'Member'
-                        })
-                    });
-                });
+            });
 
             return null;
         }
@@ -273,7 +302,10 @@ const members = {
 
     exportCSV: {
         options: [
-            'limit'
+            'limit',
+            'filter',
+            'search',
+            'paid'
         ],
         headers: {
             disposition: {
@@ -292,119 +324,66 @@ const members = {
         },
         validation: {},
         async query(frame) {
-            frame.options.withRelated = ['labels'];
-            return listMembers(frame.options);
+            frame.options.withRelated = ['labels', 'stripeSubscriptions', 'stripeSubscriptions.customer'];
+            const page = await membersService.api.members.list(frame.options);
+
+            return page;
         }
     },
 
     importCSV: {
-        statusCode: 201,
+        statusCode(result) {
+            if (result && result.meta && result.meta.stats && result.meta.stats.imported !== null) {
+                return 201;
+            } else {
+                return 202;
+            }
+        },
         permissions: {
             method: 'add'
         },
         async query(frame) {
-            let filePath = frame.file.path;
-            let fulfilled = 0;
-            let invalid = 0;
-            let duplicates = 0;
+            const siteTimezone = settingsCache.get('timezone');
 
-            const columnsToExtract = [{
-                name: 'email',
-                lookup: /^email/i
-            }, {
-                name: 'name',
-                lookup: /name/i
-            }, {
-                name: 'note',
-                lookup: /note/i
-            }, {
-                name: 'subscribed_to_emails',
-                lookup: /subscribed_to_emails/i
-            }, {
-                name: 'stripe_customer_id',
-                lookup: /stripe_customer_id/i
-            }, {
-                name: 'complimentary_plan',
-                lookup: /complimentary_plan/i
-            }, {
-                name: 'labels',
-                lookup: /labels/i
-            }, {
-                name: 'created_at',
-                lookup: /created_at/i
-            }];
+            const importLabel = {
+                name: `Import ${moment().tz(siteTimezone).format('YYYY-MM-DD HH:mm')}`
+            };
 
-            return fsLib.readCSV({
-                path: filePath,
-                columnsToExtract: columnsToExtract
-            }).then((result) => {
-                const sanitized = sanitizeInput(result);
-                invalid += result.length - sanitized.length;
+            const globalLabels = [importLabel].concat(frame.data.labels);
+            const pathToCSV = frame.file.path;
+            const headerMapping = frame.data.mapping;
 
-                return Promise.map(sanitized, ((entry) => {
-                    const api = require('./index');
-                    entry.labels = (entry.labels && entry.labels.split(',')) || [];
-                    const entryLabels = serializeMemberLabels(entry.labels);
-                    cleanupUndefined(entry);
-
-                    let subscribed;
-                    if (_.isUndefined(entry.subscribed_to_emails)) {
-                        subscribed = entry.subscribed_to_emails;
-                    } else {
-                        subscribed = (String(entry.subscribed_to_emails).toLowerCase() !== 'false');
-                    }
-
-                    return Promise.resolve(api.members.add.query({
-                        data: {
-                            members: [{
-                                email: entry.email,
-                                name: entry.name,
-                                note: entry.note,
-                                subscribed: subscribed,
-                                stripe_customer_id: entry.stripe_customer_id,
-                                comped: (String(entry.complimentary_plan).toLocaleLowerCase() === 'true'),
-                                labels: entryLabels,
-                                created_at: entry.created_at === '' ? undefined : entry.created_at
-                            }]
-                        },
-                        options: {
-                            context: frame.options.context,
-                            options: {send_email: false}
-                        }
-                    })).reflect();
-                }), {concurrency: 10})
-                    .each((inspection) => {
-                        if (inspection.isFulfilled()) {
-                            fulfilled = fulfilled + 1;
-                        } else {
-                            if (inspection.reason() instanceof common.errors.ValidationError) {
-                                duplicates = duplicates + 1;
-                            } else {
-                                // NOTE: if the error happens as a result of pure API call it doesn't get logged anywhere
-                                //       for this reason we have to make sure any unexpected errors are logged here
-                                if (Array.isArray(inspection.reason())) {
-                                    common.logging.error(inspection.reason()[0]);
-                                } else {
-                                    common.logging.error(inspection.reason());
-                                }
-
-                                invalid = invalid + 1;
-                            }
-                        }
-                    });
-            }).then(() => {
-                return {
-                    meta: {
-                        stats: {
-                            imported: fulfilled,
-                            duplicates: duplicates,
-                            invalid: invalid
-                        }
-                    }
-                };
+            return membersService.importer.process({
+                pathToCSV,
+                headerMapping,
+                globalLabels,
+                importLabel,
+                LabelModel: models.Label,
+                user: {
+                    email: frame.user.get('email')
+                }
             });
+        }
+    },
+
+    stats: {
+        options: [
+            'days'
+        ],
+        permissions: {
+            method: 'browse'
+        },
+        validation: {
+            options: {
+                days: {
+                    values: ['30', '90', '365', 'all-time']
+                }
+            }
+        },
+        async query(frame) {
+            const days = frame.options.days === 'all-time' ? 'all-time' : Number(frame.options.days || 30);
+
+            return await membersService.stats.fetch(days);
         }
     }
 };
-
-module.exports = members;

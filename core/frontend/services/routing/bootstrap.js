@@ -1,6 +1,6 @@
 const debug = require('ghost-ignition').debug('services:routing:bootstrap');
 const _ = require('lodash');
-const common = require('../../../server/lib/common');
+const {events} = require('../../../server/lib/common');
 const settingsService = require('../settings');
 const StaticRoutesRouter = require('./StaticRoutesRouter');
 const StaticPagesRouter = require('./StaticPagesRouter');
@@ -34,7 +34,7 @@ module.exports.init = (options = {start: false}) => {
     registry.resetAllRouters();
     registry.resetAllRoutes();
 
-    common.events.emit('routers.reset');
+    events.emit('routers.reset');
 
     siteRouter = new ParentRouter('SiteRouter');
     registry.setRouter('siteRouter', siteRouter);
@@ -58,7 +58,7 @@ module.exports.init = (options = {start: false}) => {
  * 3. Taxonomies: Stronger than collections, because it's an inbuilt feature.
  * 4. Collections
  * 5. Static Pages: Weaker than collections, because we first try to find a post slug and fallback to lookup a static page.
- * 6. Apps: Weakest
+ * 6. Internal Apps: Weakest
  */
 module.exports.start = (apiVersion) => {
     const RESOURCE_CONFIG = require(`./config/${apiVersion}`);
@@ -81,13 +81,6 @@ module.exports.start = (apiVersion) => {
         registry.setRouter(staticRoutesRouter.identifier, staticRoutesRouter);
     });
 
-    _.each(dynamicRoutes.taxonomies, (value, key) => {
-        const taxonomyRouter = new TaxonomyRouter(key, value, RESOURCE_CONFIG);
-        siteRouter.mountRouter(taxonomyRouter.router());
-
-        registry.setRouter(taxonomyRouter.identifier, taxonomyRouter);
-    });
-
     _.each(dynamicRoutes.collections, (value, key) => {
         const collectionRouter = new CollectionRouter(key, value, RESOURCE_CONFIG);
         siteRouter.mountRouter(collectionRouter.router());
@@ -98,6 +91,13 @@ module.exports.start = (apiVersion) => {
     siteRouter.mountRouter(staticPagesRouter.router());
 
     registry.setRouter('staticPagesRouter', staticPagesRouter);
+
+    _.each(dynamicRoutes.taxonomies, (value, key) => {
+        const taxonomyRouter = new TaxonomyRouter(key, value, RESOURCE_CONFIG);
+        siteRouter.mountRouter(taxonomyRouter.router());
+
+        registry.setRouter(taxonomyRouter.identifier, taxonomyRouter);
+    });
 
     const appRouter = new ParentRouter('AppsRouter');
     siteRouter.mountRouter(appRouter.router());

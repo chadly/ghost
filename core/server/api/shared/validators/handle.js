@@ -1,7 +1,7 @@
 const debug = require('ghost-ignition').debug('api:shared:validators:handle');
 const Promise = require('bluebird');
-const common = require('../../../lib/common');
-const sequence = require('../../../lib/promise/sequence');
+const errors = require('@tryghost/errors');
+const {sequence} = require('@tryghost/promise');
 
 /**
  * @description Shared input validation handler.
@@ -22,11 +22,11 @@ module.exports.input = (apiConfig, apiValidators, frame) => {
     const sharedValidators = require('./input');
 
     if (!apiValidators) {
-        return Promise.reject(new common.errors.IncorrectUsageError());
+        return Promise.reject(new errors.IncorrectUsageError());
     }
 
     if (!apiConfig) {
-        return Promise.reject(new common.errors.IncorrectUsageError());
+        return Promise.reject(new errors.IncorrectUsageError());
     }
 
     // ##### SHARED ALL VALIDATION

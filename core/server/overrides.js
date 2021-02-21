@@ -1,9 +1,20 @@
+const config = require('../shared/config');
+
 /**
  * If we enable bluebird debug logs we see a huge memory usage.
  * You can reproduce by removing this line and import a big database export into Ghost.
  * `NODE_ENV=development node index.js`
  */
 process.env.BLUEBIRD_DEBUG = 0;
+
+/**
+ * Force bthreads to use child_process backend until a worker_thread-compatible version of sqlite3 is published
+ * https://github.com/mapbox/node-sqlite3/issues/1386
+ */
+const isSQLite = config.get('database:client') === 'sqlite3';
+if (isSQLite) {
+    process.env.BTHREADS_BACKEND = 'child_process';
+}
 
 const moment = require('moment-timezone');
 
@@ -23,8 +34,3 @@ const {extract, hasProvider} = require('oembed-parser'); // eslint-disable-line
  *   - be careful when you work with date operations, therefor always wrap a date into moment
  */
 moment.tz.setDefault('UTC');
-
-/**
- * https://github.com/TryGhost/Ghost/issues/9064
- */
-global.Promise = require('bluebird');

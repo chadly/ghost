@@ -1,10 +1,11 @@
-const _ = require('lodash'),
-    debug = require('ghost-ignition').debug('services:routing:controllers:collection'),
-    common = require('../../../../server/lib/common'),
-    security = require('../../../../server/lib/security'),
-    urlService = require('../../url'),
-    themes = require('../../themes'),
-    helpers = require('../helpers');
+const _ = require('lodash');
+const debug = require('ghost-ignition').debug('services:routing:controllers:collection');
+const {i18n} = require('../../proxy');
+const errors = require('@tryghost/errors');
+const security = require('@tryghost/security');
+const urlService = require('../../url');
+const themes = require('../../themes');
+const helpers = require('../helpers');
 
 /**
  * @description Collection controller.
@@ -48,8 +49,8 @@ module.exports = function collectionController(req, res, next) {
         .then(function handleResult(result) {
             // CASE: requested page is greater than number of pages we have
             if (pathOptions.page > result.meta.pagination.pages) {
-                return next(new common.errors.NotFoundError({
-                    message: common.i18n.t('errors.errors.pageNotFound')
+                return next(new errors.NotFoundError({
+                    message: i18n.t('errors.errors.pageNotFound')
                 }));
             }
 

@@ -4,8 +4,8 @@
 //
 // Returns amount equal to the dominant denomintation of the currency.
 // For example, if 2100 is passed, it will return 21.
-const _ = require('lodash');
-const {errors, i18n} = require('./proxy');
+const isNumber = require('lodash/isNumber');
+const {errors, i18n} = require('../services/proxy');
 
 module.exports = function price(amount) {
     // CASE: if no amount is passed, e.g. `{{price}}` we throw an error
@@ -22,7 +22,7 @@ module.exports = function price(amount) {
         });
     }
 
-    if (!_.isNumber(amount)) {
+    if (!isNumber(amount)) {
         throw new errors.IncorrectUsageError({
             message: i18n.t('warnings.helpers.price.attrMustBeNumeric')
         });

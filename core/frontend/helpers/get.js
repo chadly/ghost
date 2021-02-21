@@ -1,20 +1,12 @@
 // # Get Helper
 // Usage: `{{#get "posts" limit="5"}}`, `{{#get "tags" limit="all"}}`
 // Fetches data from the API
-var proxy = require('./proxy'),
-    _ = require('lodash'),
-    Promise = require('bluebird'),
-    jsonpath = require('jsonpath'),
+const {config, logging, errors, i18n, hbs, api} = require('../services/proxy');
+const _ = require('lodash');
+const Promise = require('bluebird');
+const jsonpath = require('jsonpath');
 
-    config = proxy.config,
-    logging = proxy.logging,
-    errors = proxy.errors,
-    i18n = proxy.i18n,
-    createFrame = proxy.hbs.handlebars.createFrame,
-
-    api = proxy.api,
-    pathAliases,
-    get;
+const createFrame = hbs.handlebars.createFrame;
 
 const RESOURCES = {
     posts: {
@@ -32,7 +24,7 @@ const RESOURCES = {
 };
 
 // Short forms of paths which we should understand
-pathAliases = {
+const pathAliases = {
     'post.tags': 'post.tags[*].slug',
     'post.author': 'post.author.slug'
 };
@@ -45,7 +37,7 @@ pathAliases = {
  * @returns {boolean}
  */
 function isBrowse(options) {
-    var browse = true;
+    let browse = true;
 
     if (options.id || options.slug) {
         browse = false;
@@ -63,10 +55,10 @@ function isBrowse(options) {
  * @returns {String}
  */
 function resolvePaths(globals, data, value) {
-    var regex = /\{\{(.*?)\}\}/g;
+    const regex = /\{\{(.*?)\}\}/g;
 
     value = value.replace(regex, function (match, path) {
-        var result;
+        let result;
 
         // Handle aliases
         path = pathAliases[path] ? pathAliases[path] : path;
@@ -115,7 +107,7 @@ function parseOptions(globals, data, options) {
  * @param {Object} options
  * @returns {Promise}
  */
-get = function get(resource, options) {
+module.exports = function get(resource, options) {
     options = options || {};
     options.hash = options.hash || {};
     options.data = options.data || {};
@@ -149,7 +141,7 @@ get = function get(resource, options) {
 
     // @TODO: https://github.com/TryGhost/Ghost/issues/10548
     return controller[action](apiOptions).then(function success(result) {
-        var blockParams;
+        let blockParams;
 
         // used for logging details of slow requests
         returnedRowsCount = result[resource] && result[resource].length;
@@ -188,5 +180,3 @@ get = function get(resource, options) {
         }
     });
 };
-
-module.exports = get;

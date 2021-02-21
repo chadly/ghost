@@ -12,6 +12,7 @@
                 "sampleBlogDescription": "Thoughts, stories and ideas.",
                 "mail": {
                     "resetPassword": "Reset Password",
+                    "resetPasswordRequired": "Reset Password",
                     "checkEmailForInstructions": "Check your email for further instructions.",
                     "passwordChanged": "Password changed successfully.",
                     "invitationAccepted": "Invitation accepted.",
@@ -34,18 +35,6 @@
         }
     },
     "errors": {
-        "apps": {
-            "appWillNotBeLoaded": {
-                "error": "The app will not be loaded",
-                "help": "Check with the app creator, or read the app documentation for more details on app requirements"
-            },
-            "noActivateMethodLoadingApp": {
-                "error": "Error loading app named {name}; no activate() method defined."
-            },
-            "mustProvideAppName": {
-                "error": "Must provide an app name for api context"
-            }
-        },
         "middleware": {
             "api": {
                 "versionMismatch": "Client request for {clientVersion} does not match server version {serverVersion}."
@@ -239,7 +228,6 @@
                     "help": "Visit and save your profile after logging in to check for problems."
                 },
                 "incorrectPassword": "Your password is incorrect.",
-                "accountLocked": "Your account is locked. Please reset your password to log in again by clicking the \"Forgotten password?\" link!",
                 "accountSuspended": "Your account was suspended.",
                 "newPasswordsDoNotMatch": "Your new passwords do not match",
                 "passwordRequiredForOperation": "Password is required for this operation",
@@ -258,6 +246,24 @@
             "email": {
                 "emailNotFound": "Email not found.",
                 "retryNotAllowed": "Only failed emails can be retried"
+            },
+            "member": {
+                "memberAlreadyExists": {
+                    "message": "Member already exists",
+                    "context": "Attempting to {action} member with existing email address."
+                }
+            },
+            "member_stripe_customer": {
+                "customerAlreadyExists": {
+                    "message": "Stripe customer already exists",
+                    "context": "Attempting to add Stripe customer with existing Stripe customer id"
+                }
+            },
+            "stripe_customer_subscription": {
+                "subscriptionAlreadyExists": {
+                    "message": "Stripe customer subscription already exists",
+                    "context": "Attempting to add Stripe customer subscription with existing Stripe customer"
+                }
             },
             "base": {
                 "index": {
@@ -296,7 +302,6 @@
         },
         "api": {
             "common": {
-                "invalidTokenStructure": "Invalid token structure",
                 "notImplemented": "The server does not support the functionality required to fulfill the request."
             },
             "authentication": {
@@ -310,11 +315,24 @@
                 "setupAlreadyCompleted": "Setup has already been completed.",
                 "unableToSendWelcomeEmail": "Unable to send welcome email, your site will continue to function.",
                 "checkEmailConfigInstructions": "Please see {url} for instructions on configuring email.",
-                "notLoggedIn": "You are not logged in.",
-                "notTheBlogOwner": "You are not the site owner.",
-                "invalidTokenTypeHint": "Invalid token_type_hint given.",
-                "invalidTokenProvided": "Invalid token provided",
-                "tokenRevocationFailed": "Token revocation failed"
+                "notTheBlogOwner": "You are not the site owner."
+            },
+            "passwordReset": {
+                "expired": {
+                    "message": "Cannot reset password.",
+                    "context": "Password reset link expired.",
+                    "help": "Request a new password reset via the login form."
+                },
+                "invalidToken": {
+                    "message": "Cannot reset password.",
+                    "context": "Password reset link has already been used.",
+                    "help": "Request a new password reset via the login form."
+                },
+                "corruptedToken": {
+                    "message": "Cannot reset password.",
+                    "context": "Invalid password reset link.",
+                    "help": "Check if password reset link has been fully copied or request new password reset via the login form."
+                }
             },
             "configuration": {
                 "invalidKey": "Invalid key"
@@ -351,7 +369,8 @@
             },
             "redirects": {
                 "missingFile": "Please select a JSON file.",
-                "invalidFile": "Please select a valid JSON file to import."
+                "invalidFile": "Please select a valid JSON file to import.",
+                "yamlParse": "YAML input cannot be a plain string. Check the format of your YAML file."
             },
             "resource": {
                 "resourceNotFound": "{resource} not found."
@@ -363,6 +382,7 @@
             "settings": {
                 "problemFindingSetting": "Problem finding setting: {key}",
                 "accessCoreSettingFromExtReq": "Attempted to access core setting from external request",
+                "invalidEmailReceived": "Please send a valid email",
                 "activeThemeSetViaAPI": {
                     "error": "Attempted to change active_theme via settings API",
                     "help": "Please activate theme via the themes API endpoints instead"
@@ -379,13 +399,27 @@
             },
             "members": {
                 "memberNotFound": "Member not found.",
-                "memberAlreadyExists": "Email address is already member."
+                "stripeNotConnected": {
+                    "message": "Missing Stripe connection.",
+                    "context": "Attempting to import members with Stripe data when there is no Stripe account connected.",
+                    "help": "You need to connect to Stripe to import Stripe customers. "
+                },
+                "stripeCustomerNotFound": {
+                    "context": "Missing Stripe customer.",
+                    "help": "Make sure you’re connected to the correct Stripe Account."
+                },
+                "duplicateStripeCustomerIds": {
+                    "message": "Duplicate Stripe ID",
+                    "context": "Attempting to import members with duplicate Stripe customer ids.",
+                    "help": "Remove duplicate Stripe customer IDs from the CSV and re-run the import."
+                }
             },
             "tags": {
                 "tagNotFound": "Tag not found."
             },
             "labels": {
-                "labelNotFound": "Label not found."
+                "labelNotFound": "Label not found.",
+                "labelAlreadyExists": "Label already exists"
             },
             "themes": {
                 "noPermissionToBrowseThemes": "You do not have permission to browse themes.",
@@ -428,6 +462,11 @@
                 "invalidIdProvided": "Invalid id provided."
             },
             "invites": {
+                "inviteEmailAlreadyExist": {
+                    "message": "Could not create an account, email is already in use.",
+                    "context": "Attempting to create an account with existing email address.",
+                    "help": "Use different email address to register your account."
+                },
                 "inviteNotFound": "Invite not found.",
                 "inviteExpired": "Invite is expired.",
                 "emailIsRequired": "E-Mail is required.",
@@ -441,13 +480,26 @@
                 "notAllowedToInvite": "Not allowed to invite this role."
             },
             "webhooks": {
+                "noPermissionToEdit": {
+                    "message": "You do not have permission to {method} this webhook.",
+                    "context": "You may only {method} webhooks that belong to the authenticated integration. Check the supplied Admin API Key."
+                },
+                "noIntegrationIdProvided": {
+                    "context": "You may only create webhooks with 'integration_id' when using session authentication."
+                },
+                "nonExistingIntegrationIdProvided": {
+                    "context": "'integration_id' value does not match any existing integration.",
+                    "help": "Provide the 'integration_id' of an existing integration."
+                },
                 "webhookAlreadyExists": "Target URL has already been used for this event."
             },
             "oembed": {
                 "noUrlProvided": "No url provided.",
+                "insufficientMetadata": "URL contains insufficient metadata.",
                 "unknownProvider": "No provider found for supplied URL."
             },
             "userMessages": {
+                "BookshelfRelationsError": "Database error, cannot {action}.",
                 "InternalServerError": "Internal server error, cannot {action}.",
                 "IncorrectUsageError": "Incorrect usage error, cannot {action}.",
                 "NotFoundError": "Resource not found error, cannot {action}.",
@@ -470,6 +522,10 @@
                 "HostLimitError": "Host Limit error, cannot {action}.",
                 "DisabledFeatureError": "Theme validation error, the {{{helperName}}} helper is not available. Cannot {action}.",
                 "UpdateCollisionError": "Saving failed! Someone else is editing this post."
+            },
+            "snippets": {
+                "snippetNotFound": "Snippet not found.",
+                "snippetAlreadyExists": "Snippet already exists"
             }
         },
         "data": {
@@ -527,7 +583,7 @@
             },
             "mega": {
                 "requestFailed": {
-                    "error" : "The email service was unable to send an email batch."
+                    "error": "The email service was unable to send an email batch."
                 }
             }
         },
@@ -570,7 +626,7 @@
                 "pathIsRequired": "The \\{\\{asset\\}\\} helper must be passed a path"
             },
             "cancel_link": {
-                "invalidData": "The \\{\\{cancel_link\\}\\} helper was used outside of a subscription context. See https://ghost.org/docs/members/cancel-link/."
+                "invalidData": "The \\{\\{cancel_link\\}\\} helper was used outside of a subscription context. See https://ghost.org/docs/themes/members/#cancel-links."
             },
             "foreach": {
                 "iteratorNeeded": "Need to pass an iterator to #foreach"
@@ -602,7 +658,7 @@
                 "isDeprecated": "Warning: pageUrl is deprecated, please use page_url instead\nThe helper pageUrl has been replaced with page_url in Ghost 0.4.2, and will be removed entirely in Ghost 0.6\nIn your theme's pagination.hbs file, pageUrl should be renamed to page_url"
             },
             "pagination": {
-                "invalidData": "The \\{\\{pagination\\}\\} helper was used outside of a paginated context. See https://ghost.org/docs/api/handlebars-themes/helpers/pagination/.",
+                "invalidData": "The \\{\\{pagination\\}\\} helper was used outside of a paginated context. See https://ghost.org/docs/themes/helpers/pagination/.",
                 "valuesMustBeDefined": "All values must be defined for page, pages, limit and total",
                 "nextPrevValuesMustBeNumeric": "Invalid value, Next/Prev must be a number",
                 "valuesMustBeNumeric": "Invalid value, check page, pages, limit and total are numbers"
@@ -635,10 +691,10 @@
             "ghostIsRunningIn": "Ghost is running in {env}...",
             "listeningOn": "Listening on: {host}:{port}",
             "urlConfiguredAs": "Url configured as: {url}",
+            "ghostIsShuttingDown": "Ghost is shutting down",
             "ghostHasShutdown": "Ghost has shut down",
             "yourBlogIsNowOffline": "Your site is now offline",
-            "ghostWasRunningFor": "Ghost was running for",
-            "ghostIsClosingConnections": "Ghost is closing connections"
+            "ghostWasRunningFor": "Ghost was running for"
         },
         "mail": {
             "messageSent": "Message sent. Double check inbox and spam folder!"
@@ -665,7 +721,7 @@
                     "valueIsNotInteger": "Value in [{tableName}.{columnKey}] is not an integer.",
                     "themeCannotBeActivated": "{themeName} cannot be activated because it is not currently installed.",
                     "validationFailed": "Validation ({validationName}) failed for {key}",
-                    "schemaValidationFailed": "Validation failed for '{key}'",
+                    "schemaValidationFailed": "Validation failed for '{key}'.",
                     "validationFailedTypes": {
                         "isLength": "Value in [{tableName}.{key}] exceeds maximum length of {max} characters."
                     }

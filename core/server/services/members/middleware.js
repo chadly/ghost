@@ -1,8 +1,30 @@
-const common = require('../../lib/common');
-const constants = require('../../lib/constants');
-const shared = require('../../web/shared');
+const _ = require('lodash');
+const logging = require('../../../shared/logging');
 const labsService = require('../labs');
 const membersService = require('./index');
+const urlUtils = require('../../../shared/url-utils');
+const ghostVersion = require('../../lib/ghost-version');
+const settingsCache = require('../settings/cache');
+const {formattedMemberResponse} = require('./utils');
+
+// @TODO: This piece of middleware actually belongs to the frontend, not to the member app
+// Need to figure a way to separate these things (e.g. frontend actually talks to members API)
+const loadMemberSession = async function (req, res, next) {
+    if (!labsService.isSet('members')) {
+        req.member = null;
+        return next();
+    }
+    try {
+        const member = await membersService.ssr.getMemberDataFromSession(req, res);
+        Object.assign(req, {member});
+        res.locals.member = req.member;
+        next();
+    } catch (err) {
+        logging.warn(err.message);
+        Object.assign(req, {member: null});
+        next();
+    }
+};
 
 const getIdentityToken = async function (req, res) {
     try {
@@ -10,7 +32,7 @@ const getIdentityToken = async function (req, res) {
         res.writeHead(200);
         res.end(token);
     } catch (err) {
-        common.logging.warn(err.message);
+        logging.warn(err.message);
         res.writeHead(err.statusCode);
         res.end(err.message);
     }
@@ -22,84 +44,141 @@ const deleteSession = async function (req, res) {
         res.writeHead(204);
         res.end();
     } catch (err) {
-        common.logging.warn(err.message);
+        logging.warn(err.message);
         res.writeHead(err.statusCode);
         res.end(err.message);
     }
 };
 
-const getMemberDataFromSession = async function (req, res, next) {
-    if (!labsService.isSet('members')) {
-        req.member = null;
-        return next();
-    }
+const getMemberData = async function (req, res) {
     try {
         const member = await membersService.ssr.getMemberDataFromSession(req, res);
-        Object.assign(req, {member});
-        next();
+        if (member) {
+            res.json(formattedMemberResponse(member));
+        } else {
+            res.json(null);
+        }
     } catch (err) {
-        common.logging.warn(err.message);
-        Object.assign(req, {member: null});
-        next();
+        logging.warn(err.message);
+        res.writeHead(err.statusCode);
+        res.end(err.message);
     }
 };
 
-const exchangeTokenForSession = async function (req, res, next) {
-    if (!labsService.isSet('members')) {
-        return next();
+const updateMemberData = async function (req, res) {
+    try {
+        const data = _.pick(req.body, 'name', 'subscribed');
+        const member = await membersService.ssr.getMemberDataFromSession(req, res);
+        if (member) {
+            const options = {
+                id: member.id,
+                withRelated: ['stripeSubscriptions', 'stripeSubscriptions.customer']
+            };
+            const updatedMember = await membersService.api.members.update(data, options);
+
+            res.json(formattedMemberResponse(updatedMember.toJSON()));
+        } else {
+            res.json(null);
+        }
+    } catch (err) {
+        logging.warn(err.message);
+        res.writeHead(err.statusCode);
+        res.end(err.message);
     }
+};
+
+const getMemberSiteData = async function (req, res) {
+    const isStripeConfigured = membersService.config.isStripeConnected();
+    const domain = urlUtils.urlFor('home', true).match(new RegExp('^https?://([^/:?#]+)(?:[/:?#]|$)', 'i'));
+    const firstpromoterId = settingsCache.get('firstpromoter') ? settingsCache.get('firstpromoter_id') : '';
+    const blogDomain = domain && domain[1];
+    let supportAddress = settingsCache.get('members_support_address') || 'noreply';
+    if (!supportAddress.includes('@')) {
+        supportAddress = `${supportAddress}@${blogDomain}`;
+    }
+    const response = {
+        title: settingsCache.get('title'),
+        description: settingsCache.get('description'),
+        logo: settingsCache.get('logo'),
+        icon: settingsCache.get('icon'),
+        accent_color: settingsCache.get('accent_color'),
+        url: urlUtils.urlFor('home', true),
+        version: ghostVersion.safe,
+        plans: membersService.config.getPublicPlans(),
+        allow_self_signup: membersService.config.getAllowSelfSignup(),
+        is_stripe_configured: isStripeConfigured,
+        portal_button: settingsCache.get('portal_button'),
+        portal_name: settingsCache.get('portal_name'),
+        portal_plans: settingsCache.get('portal_plans'),
+        portal_button_icon: settingsCache.get('portal_button_icon'),
+        portal_button_signup_text: settingsCache.get('portal_button_signup_text'),
+        portal_button_style: settingsCache.get('portal_button_style'),
+        firstpromoter_id: firstpromoterId,
+        members_support_address: supportAddress
+    };
+
+    res.json({site: response});
+};
+
+const createSessionFromMagicLink = async function (req, res, next) {
     if (!req.url.includes('token=')) {
         return next();
     }
+
+    // req.query is a plain object, copy it to a URLSearchParams object so we can call toString()
+    const searchParams = new URLSearchParams('');
+    Object.keys(req.query).forEach((param) => {
+        // don't copy the token param
+        if (param !== 'token') {
+            searchParams.set(param, req.query[param]);
+        }
+    });
+
     try {
         const member = await membersService.ssr.exchangeTokenForSession(req, res);
-        Object.assign(req, {member});
-        next();
+        const subscriptions = member && member.stripe && member.stripe.subscriptions || [];
+
+        const action = req.query.action || req.query['portal-action'];
+
+        if (action === 'signup') {
+            let customRedirect = '';
+            if (subscriptions.find(sub => ['active', 'trialing'].includes(sub.status))) {
+                customRedirect = settingsCache.get('members_paid_signup_redirect') || '';
+            } else {
+                customRedirect = settingsCache.get('members_free_signup_redirect') || '';
+            }
+
+            if (customRedirect && customRedirect !== '/') {
+                const baseUrl = urlUtils.getSiteUrl();
+                const ensureEndsWith = (string, endsWith) => (string.endsWith(endsWith) ? string : string + endsWith);
+                const removeLeadingSlash = string => string.replace(/^\//, '');
+
+                const redirectUrl = new URL(removeLeadingSlash(ensureEndsWith(customRedirect, '/')), ensureEndsWith(baseUrl, '/'));
+
+                return res.redirect(redirectUrl.href);
+            }
+        }
+
+        // Do a standard 302 redirect to the homepage, with success=true
+        searchParams.set('success', true);
+        res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
     } catch (err) {
-        common.logging.warn(err.message);
-        return next();
+        logging.warn(err.message);
+
+        // Do a standard 302 redirect to the homepage, with success=false
+        searchParams.set('success', false);
+        res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
     }
 };
 
-const decorateResponse = function (req, res, next) {
-    res.locals.member = req.member;
-    next();
-};
-
-// @TODO only loads this stuff if members is enabled
 // Set req.member & res.locals.member if a cookie is set
 module.exports = {
-    public: [
-        shared.middlewares.labs.members,
-        shared.middlewares.servePublicFile.createPublicFileMiddleware(
-            'public/members.js',
-            'application/javascript',
-            constants.ONE_YEAR_S
-        )
-    ],
-    publicMinified: [
-        shared.middlewares.labs.members,
-        shared.middlewares.servePublicFile.createPublicFileMiddleware(
-            'public/members.min.js',
-            'application/javascript',
-            constants.ONE_YEAR_S
-        )
-    ],
-    createSessionFromToken: [
-        getMemberDataFromSession,
-        exchangeTokenForSession,
-        decorateResponse
-    ],
-    getIdentityToken: [
-        shared.middlewares.labs.members,
-        getIdentityToken
-    ],
-    deleteSession: [
-        shared.middlewares.labs.members,
-        deleteSession
-    ],
-    stripeWebhooks: [
-        shared.middlewares.labs.members,
-        (req, res, next) => membersService.api.middleware.handleStripeWebhook(req, res, next)
-    ]
+    loadMemberSession,
+    createSessionFromMagicLink,
+    getIdentityToken,
+    getMemberData,
+    updateMemberData,
+    getMemberSiteData,
+    deleteSession,
+    stripeWebhooks: (req, res, next) => membersService.api.middleware.handleStripeWebhook(req, res, next)
 };

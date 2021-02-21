@@ -1,6 +1,9 @@
 const ghostBookshelf = require('./base');
+const {i18n} = require('../lib/common');
+const errors = require('@tryghost/errors');
 
-let Tag, Tags;
+let Tag;
+let Tags;
 
 Tag = ghostBookshelf.Model.extend({
 
@@ -36,7 +39,7 @@ Tag = ghostBookshelf.Model.extend({
     },
 
     onSaving: function onSaving(newTag, attr, options) {
-        var self = this;
+        const self = this;
 
         ghostBookshelf.Model.prototype.onSaving.apply(this, arguments);
 
@@ -60,8 +63,8 @@ Tag = ghostBookshelf.Model.extend({
     },
 
     toJSON: function toJSON(unfilteredOptions) {
-        var options = Tag.filterOptions(unfilteredOptions, 'toJSON'),
-            attrs = ghostBookshelf.Model.prototype.toJSON.call(this, options);
+        const options = Tag.filterOptions(unfilteredOptions, 'toJSON');
+        const attrs = ghostBookshelf.Model.prototype.toJSON.call(this, options);
 
         // @NOTE: this serialization should be moved into api layer, it's not being moved as it's not used
         attrs.parent = attrs.parent || attrs.parent_id;
@@ -93,15 +96,15 @@ Tag = ghostBookshelf.Model.extend({
     },
 
     permittedOptions: function permittedOptions(methodName) {
-        var options = ghostBookshelf.Model.permittedOptions.call(this, methodName),
+        let options = ghostBookshelf.Model.permittedOptions.call(this, methodName);
 
-            // whitelists for the `options` hash argument on methods, by method name.
-            // these are the only options that can be passed to Bookshelf / Knex.
-            validOptions = {
-                findAll: ['columns'],
-                findOne: ['columns', 'visibility'],
-                destroy: ['destroyAll']
-            };
+        // whitelists for the `options` hash argument on methods, by method name.
+        // these are the only options that can be passed to Bookshelf / Knex.
+        const validOptions = {
+            findAll: ['columns'],
+            findOne: ['columns', 'visibility'],
+            destroy: ['destroyAll']
+        };
 
         if (validOptions[methodName]) {
             options = options.concat(validOptions[methodName]);
@@ -111,12 +114,18 @@ Tag = ghostBookshelf.Model.extend({
     },
 
     destroy: function destroy(unfilteredOptions) {
-        var options = this.filterOptions(unfilteredOptions, 'destroy', {extraAllowedProperties: ['id']});
+        const options = this.filterOptions(unfilteredOptions, 'destroy', {extraAllowedProperties: ['id']});
         options.withRelated = ['posts'];
 
         return this.forge({id: options.id})
             .fetch(options)
             .then(function destroyTagsAndPost(tag) {
+                if (!tag) {
+                    return Promise.reject(new errors.NotFoundError({
+                        message: i18n.t('errors.api.tags.tagNotFound')
+                    }));
+                }
+
                 return tag.related('posts')
                     .detach(null, options)
                     .then(function destroyTags() {

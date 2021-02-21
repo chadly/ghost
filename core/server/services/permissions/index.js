@@ -1,11 +1,11 @@
 // canThis(someUser).edit.posts([id]|[[ids]])
 // canThis(someUser).edit.post(somePost|somePostId)
 
-var models = require('../../models'),
-    actionsMap = require('./actions-map-cache'),
-    init;
+const models = require('../../models');
 
-init = function init(options) {
+const actionsMap = require('./actions-map-cache');
+
+const init = function init(options) {
     options = options || {};
 
     // Load all the permissions

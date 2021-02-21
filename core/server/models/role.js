@@ -1,10 +1,10 @@
-var _ = require('lodash'),
-    ghostBookshelf = require('./base'),
-    Promise = require('bluebird'),
-    common = require('../lib/common'),
-
-    Role,
-    Roles;
+const _ = require('lodash');
+const ghostBookshelf = require('./base');
+const Promise = require('bluebird');
+const {i18n} = require('../lib/common');
+const errors = require('@tryghost/errors');
+let Role;
+let Roles;
 
 Role = ghostBookshelf.Model.extend({
 
@@ -34,14 +34,14 @@ Role = ghostBookshelf.Model.extend({
      * @return {Array} Keys allowed in the `options` hash of the model's method.
      */
     permittedOptions: function permittedOptions(methodName) {
-        var options = ghostBookshelf.Model.permittedOptions.call(this, methodName),
+        let options = ghostBookshelf.Model.permittedOptions.call(this, methodName);
 
-            // whitelists for the `options` hash argument on methods, by method name.
-            // these are the only options that can be passed to Bookshelf / Knex.
-            validOptions = {
-                findOne: ['withRelated'],
-                findAll: ['withRelated']
-            };
+        // whitelists for the `options` hash argument on methods, by method name.
+        // these are the only options that can be passed to Bookshelf / Knex.
+        const validOptions = {
+            findOne: ['withRelated'],
+            findAll: ['withRelated']
+        };
 
         if (validOptions[methodName]) {
             options = options.concat(validOptions[methodName]);
@@ -50,7 +50,7 @@ Role = ghostBookshelf.Model.extend({
         return options;
     },
 
-    permissible: function permissible(roleModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasAppPermission, hasApiKeyPermission) {
+    permissible: function permissible(roleModelOrId, action, context, unsafeAttrs, loadedPermissions, hasUserPermission, hasApiKeyPermission) {
         // If we passed in an id instead of a model, get the model
         // then check the permissions
         if (_.isNumber(roleModelOrId) || _.isString(roleModelOrId)) {
@@ -58,8 +58,8 @@ Role = ghostBookshelf.Model.extend({
             return this.findOne({id: roleModelOrId, status: 'all'})
                 .then((foundRoleModel) => {
                     if (!foundRoleModel) {
-                        throw new common.errors.NotFoundError({
-                            message: common.i18n.t('errors.models.role.roleNotFound')
+                        throw new errors.NotFoundError({
+                            message: i18n.t('errors.models.role.roleNotFound')
                         });
                     }
 
@@ -89,17 +89,17 @@ Role = ghostBookshelf.Model.extend({
         if (action === 'assign' && loadedPermissions.apiKey) {
             // apiKey cannot 'assign' the 'Owner' role
             if (roleModel.get('name') === 'Owner') {
-                return Promise.reject(new common.errors.NoPermissionError({
-                    message: common.i18n.t('errors.models.role.notEnoughPermission')
+                return Promise.reject(new errors.NoPermissionError({
+                    message: i18n.t('errors.models.role.notEnoughPermission')
                 }));
             }
         }
 
-        if (hasUserPermission && hasAppPermission && hasApiKeyPermission) {
+        if (hasUserPermission && hasApiKeyPermission) {
             return Promise.resolve();
         }
 
-        return Promise.reject(new common.errors.NoPermissionError({message: common.i18n.t('errors.models.role.notEnoughPermission')}));
+        return Promise.reject(new errors.NoPermissionError({message: i18n.t('errors.models.role.notEnoughPermission')}));
     }
 });
 

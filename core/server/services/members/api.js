@@ -1,33 +1,37 @@
 const settingsCache = require('../settings/cache');
 const MembersApi = require('@tryghost/members-api');
-const common = require('../../lib/common');
+const logging = require('../../../shared/logging');
 const mail = require('../mail');
 const models = require('../../models');
 const signinEmail = require('./emails/signin');
 const signupEmail = require('./emails/signup');
 const subscribeEmail = require('./emails/subscribe');
-const config = require('./config');
+const updateEmail = require('./emails/updateEmail');
+const SingleUseTokenProvider = require('./SingleUseTokenProvider');
+const urlUtils = require('../../../shared/url-utils');
+
+const MAGIC_LINK_TOKEN_VALIDITY = 24 * 60 * 60 * 1000;
 
 const ghostMailer = new mail.GhostMailer();
 
 module.exports = createApiInstance;
 
-function createApiInstance() {
+function createApiInstance(config) {
     const membersApiInstance = MembersApi({
         tokenConfig: config.getTokenConfig(),
         auth: {
-            getSigninURL: config.getSigninURL,
+            getSigninURL: config.getSigninURL.bind(config),
             allowSelfSignup: config.getAllowSelfSignup(),
-            secret: config.getAuthSecret()
+            tokenProvider: new SingleUseTokenProvider(models.SingleUseToken, MAGIC_LINK_TOKEN_VALIDITY)
         },
         mail: {
             transporter: {
                 sendMail(message) {
                     if (process.env.NODE_ENV !== 'production') {
-                        common.logging.warn(message.text);
+                        logging.warn(message.text);
                     }
                     let msg = Object.assign({
-                        from: config.getEmailFromAddress(),
+                        from: config.getAuthEmailFromAddress(),
                         subject: 'Signin',
                         forceTextContent: true
                     }, message);
@@ -42,6 +46,8 @@ function createApiInstance() {
                     return `📫 Confirm your subscription to ${siteTitle}`;
                 case 'signup':
                     return `🙌 Complete your sign up to ${siteTitle}!`;
+                case 'updateEmail':
+                    return `📫 Confirm your email update for ${siteTitle}!`;
                 case 'signin':
                 default:
                     return `🔑 Secure sign in link for ${siteTitle}`;
@@ -58,7 +64,7 @@ function createApiInstance() {
 
                         ${url}
 
-                        For your security, the link will expire in 10 minutes time.
+                        For your security, the link will expire in 24 hours time.
 
                         All the best!
                         The team at ${siteTitle}
@@ -76,7 +82,7 @@ function createApiInstance() {
 
                         ${url}
 
-                        For your security, the link will expire in 10 minutes time.
+                        For your security, the link will expire in 24 hours time.
 
                         See you soon!
                         The team at ${siteTitle}
@@ -86,6 +92,21 @@ function createApiInstance() {
                         Sent to ${email}
                         If you did not make this request, you can simply delete this message. You will not be signed up, and no account will be created for you.
                         `;
+                case 'updateEmail':
+                    return `
+                            Hey there,
+
+                            Please confirm your email address with this link:
+
+                            ${url}
+
+                            For your security, the link will expire in 24 hours time.
+
+                            ---
+
+                            Sent to ${email}
+                            If you did not make this request, you can simply delete this message. This email address will not be used.
+                            `;
                 case 'signin':
                 default:
                     return `
@@ -95,7 +116,7 @@ function createApiInstance() {
 
                         ${url}
 
-                        For your security, the link will expire in 10 minutes time.
+                        For your security, the link will expire in 24 hours time.
 
                         See you soon!
                         The team at ${siteTitle}
@@ -109,24 +130,47 @@ function createApiInstance() {
             },
             getHTML(url, type, email) {
                 const siteTitle = settingsCache.get('title');
+                const siteUrl = urlUtils.urlFor('home', true);
+                const domain = urlUtils.urlFor('home', true).match(new RegExp('^https?://([^/:?#]+)(?:[/:?#]|$)', 'i'));
+                const siteDomain = (domain && domain[1]);
+                const accentColor = settingsCache.get('accent_color') || '#15212A';
                 switch (type) {
                 case 'subscribe':
-                    return subscribeEmail({url, email, siteTitle});
+                    return subscribeEmail({url, email, siteTitle, accentColor, siteDomain, siteUrl});
                 case 'signup':
-                    return signupEmail({url, email, siteTitle});
+                    return signupEmail({url, email, siteTitle, accentColor, siteDomain, siteUrl});
+                case 'updateEmail':
+                    return updateEmail({url, email, siteTitle, accentColor, siteDomain, siteUrl});
                 case 'signin':
                 default:
-                    return signinEmail({url, email, siteTitle});
+                    return signinEmail({url, email, siteTitle, accentColor, siteDomain, siteUrl});
                 }
             }
         },
         paymentConfig: {
             stripe: config.getStripePaymentConfig()
         },
-        memberStripeCustomerModel: models.MemberStripeCustomer,
-        stripeCustomerSubscriptionModel: models.StripeCustomerSubscription,
-        memberModel: models.Member,
-        logger: common.logging
+        models: {
+            /**
+             * Settings do not have their own models, so we wrap the webhook in a "fake" model
+             */
+            StripeWebhook: {
+                async upsert(data, options) {
+                    const settings = [{
+                        key: 'members_stripe_webhook_id',
+                        value: data.webhook_id
+                    }, {
+                        key: 'members_stripe_webhook_secret',
+                        value: data.secret
+                    }];
+                    await models.Settings.edit(settings, options);
+                }
+            },
+            StripeCustomer: models.MemberStripeCustomer,
+            StripeCustomerSubscription: models.StripeCustomerSubscription,
+            Member: models.Member
+        },
+        logger: logging
     });
 
     return membersApiInstance;

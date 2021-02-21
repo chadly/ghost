@@ -1,11 +1,11 @@
-const _ = require('lodash'),
-    Promise = require('bluebird'),
-    common = require('../../../../lib/common'),
-    converters = require('../../../../lib/mobiledoc/converters'),
-    message1 = 'Updating posts: apply new editor format and set comment_id field.',
-    message2 = 'Updated posts: apply new editor format and set comment_id field.',
-    message3 = 'Rollback: Updating posts: use old editor format',
-    message4 = 'Rollback: Updated posts: use old editor format';
+const _ = require('lodash');
+const Promise = require('bluebird');
+const logging = require('../../../../../shared/logging');
+const mobiledocLib = require('../../../../lib/mobiledoc');
+const message1 = 'Updating posts: apply new editor format and set comment_id field.';
+const message2 = 'Updated posts: apply new editor format and set comment_id field.';
+const message3 = 'Rollback: Updating posts: use old editor format';
+const message4 = 'Rollback: Updated posts: use old editor format';
 
 module.exports.config = {
     transaction: true
@@ -35,7 +35,7 @@ module.exports.up = (options) => {
         migrating: true
     }, options);
 
-    common.logging.info(message1);
+    logging.info(message1);
 
     // @NOTE: raw knex query, because of https://github.com/TryGhost/Ghost/issues/9983
     return localOptions
@@ -50,18 +50,18 @@ module.exports.up = (options) => {
                     mobiledoc = JSON.parse(post.mobiledoc || null);
 
                     if (!mobiledoc) {
-                        mobiledoc = converters.mobiledocConverter.blankStructure();
+                        mobiledoc = mobiledocLib.blankDocument;
                     }
                 } catch (err) {
-                    common.logging.warn(`Invalid mobiledoc structure for ${post.id}. Falling back to blank structure.`);
-                    mobiledoc = converters.mobiledocConverter.blankStructure();
+                    logging.warn(`Invalid mobiledoc structure for ${post.id}. Falling back to blank structure.`);
+                    mobiledoc = mobiledocLib.blankDocument;
                 }
 
                 // CASE: convert all old editor posts to the new editor format
                 // CASE: if mobiledoc field is null, we auto set a blank structure in the model layer
                 // CASE: if html field is null, we auto generate the html in the model layer
                 if (mobiledoc && post.html && post.html.match(/^<div class="kg-card-markdown">/)) {
-                    html = converters.mobiledocConverter.render(mobiledoc);
+                    html = mobiledocLib.mobiledocHtmlRenderer.render(mobiledoc);
                 }
                 return localOptions
                     .transacting('posts')
@@ -73,7 +73,7 @@ module.exports.up = (options) => {
                     });
             }, {concurrency: 100});
         }).then(() => {
-            common.logging.info(message2);
+            logging.info(message2);
         });
 };
 
@@ -85,7 +85,7 @@ module.exports.down = (options) => {
         migrating: true
     }, options);
 
-    common.logging.info(message3);
+    logging.info(message3);
     return localOptions
         .transacting('posts')
         .select(postAllColumns)
@@ -101,7 +101,7 @@ module.exports.down = (options) => {
 
                 // CASE: revert: all new editor posts to the old editor format
                 if (mobiledoc && post.html) {
-                    html = converters.mobiledocConverter.render(mobiledoc, version);
+                    html = mobiledocLib.mobiledocHtmlRenderer.render(mobiledoc, {version});
                 }
 
                 return localOptions
@@ -113,6 +113,6 @@ module.exports.down = (options) => {
             }, {concurrency: 100});
         })
         .then(() => {
-            common.logging.info(message4);
+            logging.info(message4);
         });
 };

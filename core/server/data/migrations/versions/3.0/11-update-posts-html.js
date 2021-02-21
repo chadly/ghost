@@ -1,8 +1,8 @@
 const _ = require('lodash');
 const Promise = require('bluebird');
 const htmlToText = require('html-to-text');
-const common = require('../../../../lib/common');
-const converters = require('../../../../lib/mobiledoc/converters');
+const logging = require('../../../../../shared/logging');
+const mobiledocLib = require('../../../../lib/mobiledoc');
 
 module.exports.config = {
     transaction: true
@@ -16,7 +16,7 @@ module.exports.up = (options) => {
         migrating: true
     }, options);
 
-    common.logging.info('Starting re-generation of posts html.');
+    logging.info('Starting re-generation of posts html.');
     return localOptions
         .transacting('posts')
         .select(columns)
@@ -28,15 +28,15 @@ module.exports.up = (options) => {
                     mobiledoc = JSON.parse(post.mobiledoc || null);
 
                     if (!mobiledoc) {
-                        common.logging.warn(`No mobiledoc for ${post.id}. Skipping.`);
+                        logging.warn(`No mobiledoc for ${post.id}. Skipping.`);
                         return Promise.resolve();
                     }
                 } catch (err) {
-                    common.logging.warn(`Invalid JSON structure for ${post.id}. Skipping.`);
+                    logging.warn(`Invalid JSON structure for ${post.id}. Skipping.`);
                     return Promise.resolve();
                 }
 
-                const html = converters.mobiledocConverter.render(mobiledoc);
+                const html = mobiledocLib.mobiledocHtmlRenderer.render(mobiledoc);
 
                 const updatedAttrs = {
                     html: html
@@ -68,7 +68,7 @@ module.exports.up = (options) => {
             }, {concurrency: 100});
         })
         .then(() => {
-            common.logging.info('Finished re-generation of posts html.');
+            logging.info('Finished re-generation of posts html.');
         });
 };
 

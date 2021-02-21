@@ -1,16 +1,16 @@
-const _ = require('lodash'),
-    Promise = require('bluebird'),
-    ObjectId = require('bson-objectid'),
-    common = require('../../../../lib/common'),
-    models = require('../../../../models');
+const _ = require('lodash');
+const Promise = require('bluebird');
+const ObjectId = require('bson-objectid');
+const logging = require('../../../../../shared/logging');
+const models = require('../../../../models');
 
 module.exports.config = {
     transaction: true
 };
 
 module.exports.up = function handleMultipleAuthors(options) {
-    const postAllColumns = ['id', 'author_id'],
-        userColumns = ['id'];
+    const postAllColumns = ['id', 'author_id'];
+    const userColumns = ['id'];
 
     let localOptions = _.merge({
         context: {internal: true}
@@ -20,7 +20,7 @@ module.exports.up = function handleMultipleAuthors(options) {
         .then(function (ownerUser) {
             return models.Post.findAll(_.merge({columns: postAllColumns}, localOptions))
                 .then(function (posts) {
-                    common.logging.info('Adding `posts_authors` relations');
+                    logging.info('Adding `posts_authors` relations');
 
                     return Promise.map(posts.models, function (post) {
                         let invalidAuthorId = false;
@@ -40,15 +40,15 @@ module.exports.up = function handleMultipleAuthors(options) {
 
                                 return post;
                             })
-                            .then(function (post) {
+                            .then(function (editedPost) {
                                 if (invalidAuthorId) {
                                     return;
                                 }
 
                                 return options.transacting('posts_authors').insert({
                                     id: ObjectId.generate(),
-                                    post_id: post.id,
-                                    author_id: post.get('author_id'),
+                                    post_id: editedPost.id,
+                                    author_id: editedPost.get('author_id'),
                                     sort_order: 0
                                 });
                             });
@@ -58,6 +58,6 @@ module.exports.up = function handleMultipleAuthors(options) {
 };
 
 module.exports.down = function handleMultipleAuthors(options) {
-    common.logging.info('Removing `posts_authors` relations');
+    logging.info('Removing `posts_authors` relations');
     return options.connection('posts_authors').truncate();
 };

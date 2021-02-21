@@ -1,29 +1,68 @@
 {
     "core": {
         "db_hash": {
-            "defaultValue": null
+            "defaultValue": null,
+            "type": "string"
+        },
+        "routes_hash": {
+            "defaultValue": null,
+            "type": "string"
         },
         "next_update_check": {
-            "defaultValue": null
+            "defaultValue": null,
+            "type": "number"
         },
         "notifications": {
-            "defaultValue": "[]"
+            "defaultValue": "[]",
+            "type": "array"
         },
         "session_secret": {
-            "defaultValue": null
+            "defaultValue": null,
+            "type": "string"
         },
         "theme_session_secret": {
-            "defaultValue": null
+            "defaultValue": null,
+            "type": "string"
+        },
+        "ghost_public_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "ghost_private_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "members_public_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "members_private_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "members_email_auth_secret": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "members_stripe_webhook_id": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "members_stripe_webhook_secret": {
+            "defaultValue": null,
+            "type": "string"
         }
     },
-    "blog": {
+    "site": {
         "title": {
             "defaultValue": "Ghost",
             "validations": {
                 "isLength": {
                     "max": 150
                 }
-            }
+            },
+            "flags": "PUBLIC",
+            "type": "string"
         },
         "description": {
             "defaultValue": "The professional publishing platform",
@@ -31,80 +70,65 @@
                 "isLength": {
                     "max": 200
                 }
-            }
+            },
+            "flags": "PUBLIC",
+            "type": "string"
         },
         "logo": {
-            "defaultValue": "https://static.ghost.org/v1.0.0/images/ghost-logo.svg"
+            "defaultValue": "https://static.ghost.org/v1.0.0/images/ghost-logo.svg",
+            "type": "string"
         },
         "cover_image": {
-            "defaultValue": "https://static.ghost.org/v3.0.0/images/publication-cover.png"
+            "defaultValue": "https://static.ghost.org/v3.0.0/images/publication-cover.png",
+            "type": "string"
         },
         "icon": {
-            "defaultValue": ""
+            "defaultValue": "",
+            "type": "string"
         },
-        "brand": {
-            "defaultValue": "{\"primaryColor\":\"\"}"
+        "accent_color": {
+            "defaultValue": "",
+            "flags": "PUBLIC",
+            "type": "string"
         },
-        "default_locale": {
+        "lang": {
             "defaultValue": "en",
             "validations": {
                 "isEmpty": false
-            }
+            },
+            "type": "string"
         },
-        "active_timezone": {
+        "timezone": {
             "defaultValue": "Etc/UTC",
             "validations": {
                 "isTimezone": true,
                 "isEmpty": false
-            }
+            },
+            "type": "string"
         },
-        "force_i18n": {
-            "defaultValue": "true",
-            "validations": {
-                "isEmpty": false,
-                "isIn": [["true", "false"]]
-            }
+        "codeinjection_head": {
+            "defaultValue": "",
+            "type": "string"
         },
-        "permalinks": {
-            "defaultValue": "/:slug/",
-            "validations": {
-                "matches": "^(\/:?[a-z0-9_-]+){1,5}\/$",
-                "matches": "(:id|:slug|:year|:month|:day|:author|:primary_tag|:primary_author)",
-                "notContains": "/ghost/"
-            }
-        },
-        "amp": {
-            "defaultValue" : "true",
-            "validations": {
-                "isIn": [["true", "false"]]
-            }
-        },
-        "ghost_head": {
-            "defaultValue" : ""
-        },
-        "ghost_foot": {
-            "defaultValue" : ""
+        "codeinjection_foot": {
+            "defaultValue": "",
+            "type": "string"
         },
         "facebook": {
-            "defaultValue" : "ghost"
+            "defaultValue": "ghost",
+            "type": "string"
         },
         "twitter": {
-            "defaultValue" : "tryghost"
-        },
-        "labs": {
-            "defaultValue": "{}"
+            "defaultValue": "ghost",
+            "type": "string"
         },
         "navigation": {
-            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://ghost.org/docs/\"}]"
+            "defaultValue": "[{\"label\":\"Home\", \"url\":\"/\"},{\"label\":\"Tag\", \"url\":\"/tag/getting-started/\"}, {\"label\":\"Author\", \"url\":\"/author/ghost/\"},{\"label\":\"Help\", \"url\":\"https://ghost.org/docs/\"}]",
+            "type": "array"
         },
         "secondary_navigation": {
-            "defaultValue": "[]"
-        },
-        "slack": {
-            "defaultValue": "[{\"url\":\"\", \"username\":\"Ghost\"}]"
-        },
-        "unsplash": {
-            "defaultValue": "{\"isActive\": true}"
+            "defaultValue": "[]",
+            "type": "array"
         },
         "meta_title": {
             "defaultValue": null,
@@ -112,7 +136,8 @@
                 "isLength": {
                     "max": 300
                 }
-            }
+            },
+            "type": "string"
         },
         "meta_description": {
             "defaultValue": null,
@@ -120,7 +145,8 @@
                 "isLength": {
                     "max": 500
                 }
-            }
+            },
+            "type": "string"
         },
         "og_image": {
             "defaultValue": null,
@@ -128,7 +154,8 @@
                 "isLength": {
                     "max": 2000
                 }
-            }
+            },
+            "type": "string"
         },
         "og_title": {
             "defaultValue": null,
@@ -136,7 +163,8 @@
                 "isLength": {
                     "max": 300
                 }
-            }
+            },
+            "type": "string"
         },
         "og_description": {
             "defaultValue": null,
@@ -144,7 +172,8 @@
                 "isLength": {
                     "max": 300
                 }
-            }
+            },
+            "type": "string"
         },
         "twitter_image": {
             "defaultValue": null,
@@ -152,7 +181,8 @@
                 "isLength": {
                     "max": 2000
                 }
-            }
+            },
+            "type": "string"
         },
         "twitter_title": {
             "defaultValue": null,
@@ -160,7 +190,8 @@
                 "isLength": {
                     "max": 300
                 }
-            }
+            },
+            "type": "string"
         },
         "twitter_description": {
             "defaultValue": null,
@@ -168,12 +199,15 @@
                 "isLength": {
                     "max": 300
                 }
-            }
+            },
+            "type": "string"
         }
     },
     "theme": {
         "active_theme": {
-            "defaultValue": "casper"
+            "defaultValue": "casper",
+            "flags": "RO",
+            "type": "string"
         }
     },
     "private": {
@@ -181,38 +215,252 @@
             "defaultValue": "false",
             "validations": {
                 "isIn": [["true", "false"]]
-            }
+            },
+            "type": "boolean"
         },
         "password": {
-            "defaultValue": ""
+            "defaultValue": "",
+            "type": "string"
         },
         "public_hash": {
-            "defaultValue": null
+            "defaultValue": null,
+            "type": "string"
         }
     },
     "members": {
-        "members_public_key": {
-            "defaultValue": null
-        },
-        "members_private_key": {
-            "defaultValue": null
-        },
-        "members_session_secret": {
-            "defaultValue": null
-        },
-        "members_email_auth_secret": {
-            "defaultValue": null
-        },
         "default_content_visibility": {
-            "defaultValue": "public"
+            "defaultValue": "public",
+            "type": "string"
         },
-        "members_subscription_settings": {
-            "defaultValue": "{\"isPaid\":false,\"fromAddress\":\"noreply\",\"allowSelfSignup\":true,\"paymentProcessors\":[{\"adapter\":\"stripe\",\"config\":{\"secret_token\":\"\",\"public_token\":\"\",\"product\":{\"name\":\"Ghost Subscription\"},\"plans\":[{\"name\":\"Monthly\",\"currency\":\"usd\",\"interval\":\"month\",\"amount\":\"\"},{\"name\":\"Yearly\",\"currency\":\"usd\",\"interval\":\"year\",\"amount\":\"\"}]}}]}"
+        "members_allow_free_signup": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["true", "false"]]
+            },
+            "type": "boolean"
+        },
+        "members_from_address": {
+            "defaultValue": "noreply",
+            "flags": "RO",
+            "type": "string"
+        },
+        "members_support_address": {
+            "defaultValue": "noreply",
+            "flags": "PUBLIC,RO",
+            "type": "string"
+        },
+        "members_reply_address": {
+            "defaultValue": "newsletter",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["newsletter", "support"]]
+            },
+            "type": "string"
+        },
+        "members_free_signup_redirect": {
+            "defaultValue": "/",
+            "type": "string"
+        },
+        "members_paid_signup_redirect": {
+            "defaultValue": "/",
+            "type": "string"
+        },
+        "stripe_product_name": {
+            "defaultValue": "Ghost Subscription",
+            "type": "string"
+        },
+        "stripe_secret_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_publishable_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_plans": {
+            "defaultValue": "[{\"name\":\"Monthly\",\"currency\":\"usd\",\"interval\":\"month\",\"amount\":500},{\"name\":\"Yearly\",\"currency\":\"usd\",\"interval\":\"year\",\"amount\":5000}]",
+            "type": "array"
+        },
+        "stripe_connect_publishable_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_connect_secret_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_connect_livemode": {
+            "defaultValue": null,
+            "type": "boolean"
+        },
+        "stripe_connect_display_name": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_connect_account_id": {
+            "defaultValue": null,
+            "type": "string"
         }
     },
-    "bulk_email": {
-        "bulk_email_settings": {
-            "defaultValue": "{\"provider\":\"mailgun\", \"apiKey\": \"\", \"domain\": \"\", \"baseUrl\": \"\"}"
+    "portal": {
+        "portal_name": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["true", "false"]]
+            },
+            "type": "boolean"
+        },
+        "portal_button": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["true", "false"]]
+            },
+            "type": "boolean"
+        },
+        "portal_plans": {
+            "defaultValue": "[\"free\", \"monthly\", \"yearly\"]",
+            "type": "array"
+        },
+        "portal_button_style": {
+            "defaultValue": "icon-and-text",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["text-only", "icon-and-text", "icon-only"]]
+            },
+            "type": "string"
+        },
+        "portal_button_icon": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "portal_button_signup_text": {
+            "defaultValue": "Subscribe",
+            "type": "string"
+        }
+    },
+    "email": {
+        "mailgun_domain": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "mailgun_api_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "mailgun_base_url": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "email_track_opens": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [["true", "false"]]
+            },
+            "type": "boolean"
+        }
+    },
+    "amp": {
+        "amp": {
+            "defaultValue": "true",
+            "validations": {
+                "isIn": [["true", "false"]]
+            },
+            "type": "boolean"
+        },
+        "amp_gtag_id": {
+            "defaultValue": null,
+            "type": "string"
+        }
+    },
+    "firstpromoter": {
+        "firstpromoter": {
+            "defaultValue": "false",
+            "validations": {
+                "isIn": [
+                    [
+                        "true",
+                        "false"
+                    ]
+                ]
+            },
+            "type": "boolean"
+        },
+        "firstpromoter_id": {
+            "defaultValue": null,
+            "type": "string"
+        }
+    },
+    "labs": {
+        "labs": {
+            "defaultValue": "{}",
+            "type": "object"
+        }
+    },
+    "slack": {
+        "slack": {
+            "defaultValue": "[{\"url\":\"\", \"username\":\"Ghost\"}]",
+            "type": "array"
+        }
+    },
+    "unsplash": {
+        "unsplash": {
+            "defaultValue": "{\"isActive\": true}",
+            "type": "object"
+        }
+    },
+    "views": {
+        "shared_views": {
+            "defaultValue": "[]",
+            "type": "array"
+        }
+    },
+    "newsletter": {
+        "newsletter_show_badge": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [
+                    [
+                        "true",
+                        "false"
+                    ]
+                ]
+            },
+            "type": "boolean"
+        },
+        "newsletter_show_header": {
+            "defaultValue": "true",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [
+                    [
+                        "true",
+                        "false"
+                    ]
+                ]
+            },
+            "type": "boolean"
+        },
+        "newsletter_body_font_category": {
+            "defaultValue": "sans_serif",
+            "validations": {
+                "isEmpty": false,
+                "isIn": [
+                    [
+                        "serif",
+                        "sans_serif"
+                    ]
+                ]
+            },
+            "type": "string"
+        },
+        "newsletter_footer_content": {
+            "defaultValue": "",
+            "type": "string"
         }
     }
 }

@@ -1,14 +1,14 @@
-const crypto = require('crypto'),
-    config = require('../../server/config'),
-    imageLib = require('../../server/lib/image'),
-    urlUtils = require('../../server/lib/url-utils');
+const crypto = require('crypto');
+const config = require('../../shared/config');
+const {blogIcon} = require('../../server/lib/image');
+const urlUtils = require('../../shared/url-utils');
 
 /**
  * Serve either uploaded favicon or default
  * @return {string}
  */
 function getFaviconUrl() {
-    return imageLib.blogIcon.getIconUrl();
+    return blogIcon.getIconUrl();
 }
 
 function getAssetUrl(path, hasMinFile) {
@@ -20,7 +20,7 @@ function getAssetUrl(path, hasMinFile) {
 
     // CASE: Build the output URL
     // Add subdirectory...
-    var output = urlUtils.urlJoin(urlUtils.getSubdir(), '/');
+    let output = urlUtils.urlJoin(urlUtils.getSubdir(), '/');
 
     // Optionally add /assets/
     if (!path.match(/^public/) && !path.match(/^asset/)) {

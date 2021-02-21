@@ -1,11 +1,11 @@
-const path = require('path'),
-    express = require('express'),
-    middleware = require('./middleware'),
-    bodyParser = require('body-parser'),
-    routing = require('../../../services/routing'),
-    web = require('../../../../server/web'),
-    templateName = 'private',
-    privateRouter = express.Router();
+const path = require('path');
+const express = require('../../../../shared/express');
+const middleware = require('./middleware');
+const bodyParser = require('body-parser');
+const routing = require('../../../services/routing');
+const web = require('../../../../server/web');
+const templateName = 'private';
+const privateRouter = express.Router(templateName);
 
 function _renderer(req, res) {
     res.routerOptions = {
@@ -30,14 +30,14 @@ function _renderer(req, res) {
 privateRouter
     .route('/')
     .get(
-        middleware.isPrivateSessionAuth,
+        middleware.redirectPrivateToHomeIfLoggedIn,
         _renderer
     )
     .post(
         bodyParser.urlencoded({extended: true}),
-        middleware.isPrivateSessionAuth,
+        middleware.redirectPrivateToHomeIfLoggedIn,
         web.shared.middlewares.brute.privateBlog,
-        middleware.authenticateProtection,
+        middleware.doLoginToPrivateSite,
         _renderer
     );
 

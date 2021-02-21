@@ -2,7 +2,8 @@ const util = require('util');
 const moment = require('moment');
 const debug = require('ghost-ignition').debug('scheduling-default');
 const SchedulingBase = require('./SchedulingBase');
-const common = require('../../lib/common');
+const logging = require('../../../shared/logging');
+const errors = require('@tryghost/errors');
 const request = require('../../lib/request');
 
 /**
@@ -13,7 +14,7 @@ const request = require('../../lib/request');
  *
  * "node-cron" did not perform well enough and we really just needed a simple time management.
 
- * @param {Objec†} options
+ * @param {Object} options
  * @constructor
  */
 function SchedulingDefault(options) {
@@ -45,14 +46,11 @@ util.inherits(SchedulingDefault, SchedulingBase);
  * A new job get's added when the post scheduler module receives a new model event e.g. "post.scheduled".
  *
  * @param {Object} object
- *                       {
- *                          time: [Number] A unix timestamp
- *                          url:  [String] The full post/page API url to publish it.
- *                          extra: {
- *                              httpMethod: [String] The method of the target API endpoint.
- *                              oldTime:    [Number] The previous published time.
- *                          }
- *                       }
+ * @param {Number} object.time - unix timestamp
+ * @param {String} object.url - full post/page API url to publish the resource.
+ * @param {Object} object.extra
+ * @param {String} object.extra.httpMethod - the method of the target API endpoint.
+ * @param {Number} object.extra.oldTime - the previous published time.
  */
 SchedulingDefault.prototype.schedule = function (object) {
     this._addJob(object);
@@ -64,18 +62,13 @@ SchedulingDefault.prototype.schedule = function (object) {
  * Unscheduling means: scheduled -> draft.
  *
  * @param {Object} object
- *                       {
- *                          time: [Number] A unix timestamp
- *                          url:  [String] The full post/page API url to publish it.
- *                          extra: {
- *                              httpMethod: [String] The method of the target API endpoint.
- *                              oldTime:    [Number] The previous published time.
- *                          }
- *                       }
+ * @param {Number} object.time - unix timestamp
+ * @param {String} object.url - full post/page API url to publish the resource.
+ * @param {Object} object.extra
+ * @param {String} object.extra.httpMethod - the method of the target API endpoint.
+ * @param {Number} object.extra.oldTime - the previous published time.
  * @param {Object} options
- *                      {
- *                          bootstrap: [Boolean]
- *                      }
+ * @param {Boolean} [options.bootstrap]
  */
 SchedulingDefault.prototype.unschedule = function (object, options = {bootstrap: false}) {
     /**
@@ -99,8 +92,7 @@ SchedulingDefault.prototype.unschedule = function (object, options = {bootstrap:
  */
 SchedulingDefault.prototype.run = function () {
     const self = this;
-    let timeout = null,
-        recursiveRun;
+    let timeout = null;
 
     // NOTE: Ensure the scheduler never runs twice.
     if (this.isRunning) {
@@ -109,10 +101,10 @@ SchedulingDefault.prototype.run = function () {
 
     this.isRunning = true;
 
-    recursiveRun = function recursiveRun() {
+    let recursiveRun = function recursiveRun() {
         timeout = setTimeout(function () {
-            const times = Object.keys(self.allJobs),
-                nextJobs = {};
+            const times = Object.keys(self.allJobs);
+            const nextJobs = {};
 
             // CASE: We stop till the offset is too big. We are only interested in jobs which need get executed soon.
             times.every(function (time) {
@@ -142,11 +134,11 @@ SchedulingDefault.prototype.run = function () {
  * @private
  */
 SchedulingDefault.prototype._addJob = function (object) {
-    let timestamp = moment(object.time).valueOf(),
-        keys = [],
-        sortedJobs = {},
-        instantJob = {},
-        i = 0;
+    let timestamp = moment(object.time).valueOf();
+    let keys = [];
+    let sortedJobs = {};
+    let instantJob = {};
+    let i = 0;
 
     // CASE: should have been already pinged or should be pinged soon
     if (moment(timestamp).diff(moment(), 'minutes') < this.offsetInMinutes) {
@@ -218,12 +210,12 @@ SchedulingDefault.prototype._deleteJob = function (object) {
  * We can't use "process.nextTick" otherwise we will block I/O operations.
  */
 SchedulingDefault.prototype._execute = function (jobs) {
-    const keys = Object.keys(jobs),
-        self = this;
+    const keys = Object.keys(jobs);
+    const self = this;
 
     keys.forEach(function (timestamp) {
-        let timeout = null,
-            diff = moment(Number(timestamp)).diff(moment());
+        let timeout = null;
+        let diff = moment(Number(timestamp)).diff(moment());
 
         // NOTE: awake a little before...
         timeout = setTimeout(function () {
@@ -278,7 +270,7 @@ SchedulingDefault.prototype._pingUrl = function (object) {
 
     const httpMethod = object.extra ? object.extra.httpMethod : 'PUT';
     const tries = object.tries || 0;
-    const requestTimeout = object.extra ? object.extra.timeoutInMS : 1000 * 5;
+    const requestTimeout = (object.extra && object.extra.timeoutInMS) ? object.extra.timeoutInMS : 1000 * 5;
     const maxTries = 30;
 
     const options = {
@@ -314,7 +306,7 @@ SchedulingDefault.prototype._pingUrl = function (object) {
                 this._pingUrl(object);
             }, this.retryTimeoutInMs);
 
-            common.logging.error(new common.errors.GhostError({
+            logging.error(new errors.GhostError({
                 err,
                 context: 'Retrying...',
                 level: 'normal'
@@ -323,7 +315,7 @@ SchedulingDefault.prototype._pingUrl = function (object) {
             return;
         }
 
-        common.logging.error(new common.errors.GhostError({
+        logging.error(new errors.GhostError({
             err,
             level: 'critical'
         }));

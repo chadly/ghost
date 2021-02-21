@@ -1,6 +1,6 @@
 const _ = require('lodash');
 const urlService = require('../../../../../../../frontend/services/url');
-const urlUtils = require('../../../../../../lib/url-utils');
+const urlUtils = require('../../../../../../../shared/url-utils');
 const localUtils = require('../../../index');
 
 const forPost = (id, attrs, frame) => {
@@ -46,9 +46,10 @@ const forPost = (id, attrs, frame) => {
         }
     });
 
-    ['feature_image', 'og_image', 'twitter_image', 'canonical_url'].forEach((attr) => {
-        if (attrs[attr]) {
-            attrs[attr] = urlUtils.relativeToAbsolute(attrs[attr]);
+    ['feature_image', 'canonical_url', 'posts_meta.og_image', 'posts_meta.twitter_image'].forEach((path) => {
+        const value = _.get(attrs, path);
+        if (value) {
+            _.set(attrs, path, urlUtils.relativeToAbsolute(value));
         }
     });
 
@@ -92,7 +93,7 @@ const forSettings = (attrs) => {
     // @NOTE: Admin & Content API return a different format, need to mappers
     if (_.isArray(attrs)) {
         attrs.forEach((obj) => {
-            if (['cover_image', 'logo', 'icon'].includes(obj.key) && obj.value) {
+            if (['cover_image', 'logo', 'icon', 'portal_button_icon'].includes(obj.key) && obj.value) {
                 obj.value = urlUtils.urlFor('image', {image: obj.value}, true);
             }
         });

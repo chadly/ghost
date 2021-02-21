@@ -1,6 +1,7 @@
 const _ = require('lodash');
 const debug = require('ghost-ignition').debug('frontend:services:settings:validate');
-const common = require('../../../server/lib/common');
+const {i18n} = require('../proxy');
+const errors = require('@tryghost/errors');
 const themeService = require('../themes');
 const _private = {};
 let RESOURCE_CONFIG;
@@ -40,8 +41,8 @@ _private.validateData = function validateData(object) {
         };
 
         if (!shortForm.match(/.*\..*/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: shortForm,
                     reason: 'Incorrect Format. Please use e.g. tag.recipes'
                 })
@@ -52,7 +53,7 @@ _private.validateData = function validateData(object) {
 
         if (!RESOURCE_CONFIG.QUERY[resourceKey] ||
             (Object.prototype.hasOwnProperty.call(RESOURCE_CONFIG.QUERY[resourceKey], 'internal') && RESOURCE_CONFIG.QUERY[resourceKey].internal === true)) {
-            throw new common.errors.ValidationError({
+            throw new errors.ValidationError({
                 message: `Resource key not supported. ${resourceKey}`,
                 help: 'Please use: tag, user, post or page.'
             });
@@ -96,7 +97,7 @@ _private.validateData = function validateData(object) {
         _.each(object.data, (value, key) => {
             // CASE: a name is required to define the data longform
             if (['resource', 'type', 'limit', 'order', 'include', 'filter', 'status', 'visibility', 'slug', 'redirect'].indexOf(key) !== -1) {
-                throw new common.errors.ValidationError({
+                throw new errors.ValidationError({
                     message: 'Please wrap the data definition into a custom name.',
                     help: 'Example:\n data:\n  my-tag:\n    resource: tags\n    ...\n'
                 });
@@ -104,7 +105,7 @@ _private.validateData = function validateData(object) {
 
             // @NOTE: We disallow author, because {{author}} is deprecated.
             if (key === 'author') {
-                throw new common.errors.ValidationError({
+                throw new errors.ValidationError({
                     message: 'Please choose a different name. We recommend not using author.'
                 });
             }
@@ -114,11 +115,11 @@ _private.validateData = function validateData(object) {
                 const longForm = shortToLongForm(object.data[key], {resourceKey: key});
                 data.query = _.merge(data.query, longForm.query);
 
-                _.each(Object.keys(longForm.router), (key) => {
-                    if (data.router[key]) {
-                        data.router[key] = data.router[key].concat(longForm.router[key]);
+                _.each(Object.keys(longForm.router), (routerKey) => {
+                    if (data.router[routerKey]) {
+                        data.router[routerKey] = data.router[routerKey].concat(longForm.router[routerKey]);
                     } else {
-                        data.router[key] = longForm.router[key];
+                        data.router[routerKey] = longForm.router[routerKey];
                     }
                 });
 
@@ -131,8 +132,8 @@ _private.validateData = function validateData(object) {
 
             _.each(requiredQueryFields, (option) => {
                 if (!Object.prototype.hasOwnProperty.call(object.data[key], option)) {
-                    throw new common.errors.ValidationError({
-                        message: common.i18n.t('errors.services.settings.yaml.validate', {
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.services.settings.yaml.validate', {
                             at: JSON.stringify(object.data[key]),
                             reason: `${option} is required.`
                         })
@@ -140,8 +141,8 @@ _private.validateData = function validateData(object) {
                 }
 
                 if (allowedQueryValues[option] && allowedQueryValues[option].indexOf(object.data[key][option]) === -1) {
-                    throw new common.errors.ValidationError({
-                        message: common.i18n.t('errors.services.settings.yaml.validate', {
+                    throw new errors.ValidationError({
+                        message: i18n.t('errors.services.settings.yaml.validate', {
                             at: JSON.stringify(object.data[key]),
                             reason: `${object.data[key][option]} not supported. Please use ${_.uniq(allowedQueryValues[option])}.`
                         })
@@ -183,11 +184,20 @@ _private.validateData = function validateData(object) {
 };
 
 _private.validateRoutes = function validateRoutes(routes) {
+    if (routes.constructor !== Object) {
+        throw new errors.ValidationError({
+            message: i18n.t('errors.services.settings.yaml.validate', {
+                at: routes,
+                reason: '`routes` must be a YAML map.'
+            })
+        });
+    }
+
     _.each(routes, (routingTypeObject, routingTypeObjectKey) => {
         // CASE: we hard-require trailing slashes for the index route
         if (!routingTypeObjectKey.match(/\/$/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'A trailing slash is required.'
                 })
@@ -196,8 +206,8 @@ _private.validateRoutes = function validateRoutes(routes) {
 
         // CASE: we hard-require leading slashes for the index route
         if (!routingTypeObjectKey.match(/^\//)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'A leading slash is required.'
                 })
@@ -206,8 +216,8 @@ _private.validateRoutes = function validateRoutes(routes) {
 
         // CASE: you define /about/:
         if (!routingTypeObject) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'Please define a template.'
                 }),
@@ -223,11 +233,20 @@ _private.validateRoutes = function validateRoutes(routes) {
 };
 
 _private.validateCollections = function validateCollections(collections) {
+    if (collections.constructor !== Object) {
+        throw new errors.ValidationError({
+            message: i18n.t('errors.services.settings.yaml.validate', {
+                at: collections,
+                reason: '`collections` must be a YAML map.'
+            })
+        });
+    }
+
     _.each(collections, (routingTypeObject, routingTypeObjectKey) => {
         // CASE: we hard-require trailing slashes for the collection index route
         if (!routingTypeObjectKey.match(/\/$/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'A trailing slash is required.'
                 })
@@ -236,8 +255,8 @@ _private.validateCollections = function validateCollections(collections) {
 
         // CASE: we hard-require leading slashes for the collection index route
         if (!routingTypeObjectKey.match(/^\//)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'A leading slash is required.'
                 })
@@ -245,8 +264,8 @@ _private.validateCollections = function validateCollections(collections) {
         }
 
         if (!Object.prototype.hasOwnProperty.call(routingTypeObject, 'permalink')) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'Please define a permalink route.'
                 }),
@@ -257,8 +276,8 @@ _private.validateCollections = function validateCollections(collections) {
         // CASE: validate permalink key
 
         if (!routingTypeObject.permalink) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'Please define a permalink route.'
                 }),
@@ -268,8 +287,8 @@ _private.validateCollections = function validateCollections(collections) {
 
         // CASE: we hard-require trailing slashes for the value/permalink route
         if (!routingTypeObject.permalink.match(/\/$/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject.permalink,
                     reason: 'A trailing slash is required.'
                 })
@@ -278,8 +297,8 @@ _private.validateCollections = function validateCollections(collections) {
 
         // CASE: we hard-require leading slashes for the value/permalink route
         if (!routingTypeObject.permalink.match(/^\//)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject.permalink,
                     reason: 'A leading slash is required.'
                 })
@@ -288,8 +307,8 @@ _private.validateCollections = function validateCollections(collections) {
 
         // CASE: notation /:slug/ or /:primary_author/ is not allowed. We only accept /{{...}}/.
         if (routingTypeObject.permalink && routingTypeObject.permalink.match(/\/:\w+/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject.permalink,
                     reason: 'Please use the following notation e.g. /{slug}/.'
                 })
@@ -310,11 +329,20 @@ _private.validateCollections = function validateCollections(collections) {
 };
 
 _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
+    if (taxonomies.constructor !== Object) {
+        throw new errors.ValidationError({
+            message: i18n.t('errors.services.settings.yaml.validate', {
+                at: taxonomies,
+                reason: '`taxonomies` must be a YAML map.'
+            })
+        });
+    }
+
     const validRoutingTypeObjectKeys = Object.keys(RESOURCE_CONFIG.TAXONOMIES);
     _.each(taxonomies, (routingTypeObject, routingTypeObjectKey) => {
         if (!routingTypeObject) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'Please define a taxonomy permalink route.'
                 }),
@@ -323,8 +351,8 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
         }
 
         if (!validRoutingTypeObjectKeys.includes(routingTypeObjectKey)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObjectKey,
                     reason: 'Unknown taxonomy.'
                 })
@@ -333,8 +361,8 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
 
         // CASE: we hard-require trailing slashes for the taxonomie permalink route
         if (!routingTypeObject.match(/\/$/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject,
                     reason: 'A trailing slash is required.'
                 })
@@ -343,8 +371,8 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
 
         // CASE: we hard-require leading slashes for the value/permalink route
         if (!routingTypeObject.match(/^\//)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject,
                     reason: 'A leading slash is required.'
                 })
@@ -353,8 +381,8 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
 
         // CASE: notation /:slug/ or /:primary_author/ is not allowed. We only accept /{{...}}/.
         if (routingTypeObject && routingTypeObject.match(/\/:\w+/)) {
-            throw new common.errors.ValidationError({
-                message: common.i18n.t('errors.services.settings.yaml.validate', {
+            throw new errors.ValidationError({
+                message: i18n.t('errors.services.settings.yaml.validate', {
                     at: routingTypeObject,
                     reason: 'Please use the following notation e.g. /{slug}/.'
                 })
@@ -374,6 +402,7 @@ _private.validateTaxonomies = function validateTaxonomies(taxonomies) {
 
 /**
  * Validate and sanitize the routing object.
+ * NOTE: mutates the object even if it's a valid configuration
  */
 module.exports = function validate(object) {
     if (!object) {
@@ -396,7 +425,7 @@ module.exports = function validate(object) {
 
     debug('api version', apiVersion);
 
-    RESOURCE_CONFIG = require(`../../../frontend/services/routing/config/${apiVersion}`);
+    RESOURCE_CONFIG = require(`../routing/config/${apiVersion}`);
 
     object.routes = _private.validateRoutes(object.routes);
     object.collections = _private.validateCollections(object.collections);

@@ -1,14 +1,11 @@
-var downsize = require('downsize'),
-    Promise = require('bluebird'),
-    cheerio = require('cheerio'),
-    RSS = require('rss'),
-    urlUtils = require('../../../server/lib/url-utils'),
-    urlService = require('../url'),
-    generateFeed,
-    generateItem,
-    generateTags;
+const downsize = require('downsize');
+const Promise = require('bluebird');
+const cheerio = require('cheerio');
+const RSS = require('rss');
+const urlUtils = require('../../../shared/url-utils');
+const urlService = require('../url');
 
-generateTags = function generateTags(data) {
+const generateTags = function generateTags(data) {
     if (data.tags) {
         return data.tags.reduce(function (tags, tag) {
             if (tag.visibility !== 'internal') {
@@ -21,7 +18,7 @@ generateTags = function generateTags(data) {
     return [];
 };
 
-generateItem = function generateItem(post, secure) {
+const generateItem = function generateItem(post, secure) {
     const itemUrl = urlService.getUrlByResourceId(post.id, {secure, absolute: true});
     const htmlContent = cheerio.load(urlUtils.htmlRelativeToAbsolute(post.html, itemUrl, {secure}) || '', {decodeEntities: false});
     const item = {
@@ -71,7 +68,7 @@ generateItem = function generateItem(post, secure) {
  * @param {string} baseUrl
  * @param {{title, description, safeVersion, secure, posts}} data
  */
-generateFeed = function generateFeed(baseUrl, data) {
+const generateFeed = function generateFeed(baseUrl, data) {
     const {secure} = data;
 
     const feed = new RSS({

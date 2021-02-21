@@ -6,21 +6,16 @@
 //
 // Converts normal HTML into AMP HTML with Amperize module and uses a cache to return it from
 // there if available. The cacheId is a combination of `updated_at` and the `slug`.
-const Promise = require('bluebird'),
-    moment = require('moment'),
-    proxy = require('../../../../helpers/proxy'),
-    SafeString = proxy.SafeString,
-    logging = proxy.logging,
-    i18n = proxy.i18n,
-    errors = proxy.errors,
-    urlUtils = require('../../../../../server/lib/url-utils'),
-    amperizeCache = {};
+const Promise = require('bluebird');
 
-let allowedAMPTags = [],
-    allowedAMPAttributes = {},
-    amperize = null,
-    ampHTML = '',
-    cleanHTML = '';
+const moment = require('moment');
+const {SafeString, logging, i18n, errors, urlUtils} = require('../../../../services/proxy');
+const amperizeCache = {};
+let allowedAMPTags = [];
+let allowedAMPAttributes = {};
+let amperize = null;
+let ampHTML = '';
+let cleanHTML = '';
 
 allowedAMPTags = ['html', 'body', 'article', 'section', 'nav', 'aside', 'h1', 'h2',
     'h3', 'h4', 'h5', 'h6', 'header', 'footer', 'address', 'p', 'hr',
@@ -36,8 +31,8 @@ allowedAMPTags = ['html', 'body', 'article', 'section', 'nav', 'aside', 'h1', 'h
     'table', 'caption', 'colgroup', 'col', 'tbody', 'thead', 'tfoot', 'tr', 'td',
     'th', 'button', 'noscript', 'acronym', 'center', 'dir', 'hgroup', 'listing',
     'multicol', 'nextid', 'nobr', 'spacer', 'strike', 'tt', 'xmp', 'amp-img',
-    'amp-video', 'amp-ad', 'amp-embed', 'amp-anim', 'amp-iframe', 'amp-pixel',
-    'amp-audio', 'O:P'];
+    'amp-video', 'amp-ad', 'amp-embed', 'amp-anim', 'amp-iframe', 'amp-youtube',
+    'amp-pixel', 'amp-audio', 'O:P'];
 
 allowedAMPAttributes = {
     '*': ['itemid', 'itemprop', 'itemref', 'itemscope', 'itemtype', 'accesskey', 'class', 'dir', 'draggable',
@@ -110,7 +105,8 @@ allowedAMPAttributes = {
     'amp-anim': ['media', 'noloading', 'alt', 'attribution', 'placeholder', 'src', 'srcset', 'width', 'height', 'layout'],
     'amp-audio': ['src', 'width', 'height', 'autoplay', 'loop', 'muted', 'controls'],
     'amp-iframe': ['src', 'srcdoc', 'width', 'height', 'layout', 'frameborder', 'allowfullscreen', 'allowtransparency',
-        'sandbox', 'referrerpolicy']
+        'sandbox', 'referrerpolicy'],
+    'amp-youtube': ['src', 'width', 'height', 'layout', 'frameborder', 'autoplay', 'loop', 'data-videoid', 'data-live-channelid']
 };
 
 function getAmperizeHTML(html, post) {
@@ -118,8 +114,8 @@ function getAmperizeHTML(html, post) {
         return;
     }
 
-    let Amperize = require('amperize'),
-        startedAtMoment = moment();
+    let Amperize = require('amperize');
+    let startedAtMoment = moment();
 
     amperize = amperize || new Amperize();
 
@@ -162,11 +158,12 @@ function getAmperizeHTML(html, post) {
 }
 
 function ampContent() {
-    let sanitizeHtml = require('sanitize-html'),
-        cheerio = require('cheerio'),
-        amperizeHTML = {
-            amperize: getAmperizeHTML(this.html, this)
-        };
+    let sanitizeHtml = require('sanitize-html');
+    let cheerio = require('cheerio');
+
+    let amperizeHTML = {
+        amperize: getAmperizeHTML(this.html, this)
+    };
 
     return Promise.props(amperizeHTML).then((result) => {
         let $ = null;
